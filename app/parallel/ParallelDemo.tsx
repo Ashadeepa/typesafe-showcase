@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { runParallel, runSequential, type RunResult } from "./actions";
 import { TICKETS } from "@/lib/data";
+import { useApiKey } from "@/lib/api-key-context";
 
 type RunState = { sequential: RunResult | null; parallel: RunResult | null };
 
@@ -83,6 +84,7 @@ function TicketRow({
 const MAX_EXTRA_TICKETS = 10;
 
 export default function ParallelDemo() {
+  const { apiKey } = useApiKey();
   const [runs, setRuns] = useState<RunState>({ sequential: null, parallel: null });
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -109,7 +111,9 @@ export default function ParallelDemo() {
     startTransition(async () => {
       try {
         const result =
-          kind === "sequential" ? await runSequential(customTickets) : await runParallel(customTickets);
+          kind === "sequential"
+            ? await runSequential(apiKey, customTickets)
+            : await runParallel(apiKey, customTickets);
         setRuns((prev) => ({ ...prev, [kind]: result }));
       } catch (e) {
         setError(e instanceof Error ? e.message : "Something went wrong calling TypeSafe.");
@@ -171,7 +175,7 @@ export default function ParallelDemo() {
       <div className="flex flex-wrap gap-3">
         <button
           onClick={() => trigger("sequential")}
-          disabled={pending}
+          disabled={pending || !apiKey}
           className="rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           style={{ backgroundColor: "var(--series-1)" }}
         >
@@ -179,7 +183,7 @@ export default function ParallelDemo() {
         </button>
         <button
           onClick={() => trigger("parallel")}
-          disabled={pending}
+          disabled={pending || !apiKey}
           className="rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           style={{ backgroundColor: "var(--series-2)" }}
         >

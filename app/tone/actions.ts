@@ -1,8 +1,9 @@
 "use server";
 
 import "server-only";
-import { score, TypeSafeClient } from "@typesafe-ai/sdk";
+import { score, type TypeSafeClient } from "@typesafe-ai/sdk";
 import { NOTES } from "@/lib/data";
+import { requireClient } from "@/lib/typesafe-client";
 
 const QUESTION_ID = "escalation";
 
@@ -51,19 +52,23 @@ async function judgeOne(client: TypeSafeClient, note: (typeof NOTES)[number]): P
   };
 }
 
-export async function runToneCheck(): Promise<NoteResult[]> {
-  const client = new TypeSafeClient();
+export async function runToneCheck(apiKey: string): Promise<NoteResult[]> {
+  const client = requireClient(apiKey);
   const results = await Promise.all(NOTES.map((note) => judgeOne(client, note)));
   return results.sort((a, b) => b.score - a.score);
 }
 
 const MAX_INPUT_LENGTH = 500;
 
-export async function runToneCheckCustom(text: string, context: string): Promise<NoteResult> {
+export async function runToneCheckCustom(
+  apiKey: string,
+  text: string,
+  context: string,
+): Promise<NoteResult> {
+  const client = requireClient(apiKey);
   const trimmedText = text.trim().slice(0, MAX_INPUT_LENGTH);
   if (!trimmedText) throw new Error("Enter a message to check.");
   const trimmedContext = context.trim().slice(0, MAX_INPUT_LENGTH) || "Custom input";
 
-  const client = new TypeSafeClient();
   return judgeOne(client, { id: -1, text: trimmedText, context: trimmedContext });
 }

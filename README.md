@@ -1,8 +1,14 @@
 # typesafe-showcase
 
 A Next.js UI for showing & telling [TypeSafe](https://docs.typesafe.ai) System One (Jev)
-use cases, deployable to Vercel. All TypeSafe calls run server-side (Server Actions) — the API
-key never reaches the browser.
+use cases, deployable to Vercel.
+
+**Bring your own key.** This app has no shared TypeSafe key on the server — every visitor pastes
+their own `TYPESAFE_API_KEY` into the bar at the top of the page (stored only in their browser's
+`localStorage`). Each Server Action takes that key as a parameter and constructs its own
+`TypeSafeClient` per request (`lib/typesafe-client.ts`); there's nothing in this server's
+environment for a visitor to spend. Calls still run server-side — the key just isn't baked into
+the deployment.
 
 ## Use cases
 
@@ -24,9 +30,10 @@ Ported from the Python demos in [typesafe-jev-model-use-cases](https://github.co
 
 ```bash
 npm install
-cp .env.example .env.local   # fill in TYPESAFE_API_KEY
 npm run dev
 ```
+
+Open the app and paste a `TYPESAFE_API_KEY` into the bar at the top — no `.env` setup needed.
 
 ## Deploying to Vercel
 
@@ -34,6 +41,4 @@ npm run dev
 vercel deploy
 ```
 
-Set `TYPESAFE_API_KEY` as an environment variable in the Vercel project settings (or via
-`vercel env add TYPESAFE_API_KEY`) before deploying — it's read server-side only and is never
-bundled into client code.
+No environment variables to configure — each visitor supplies their own key at runtime.

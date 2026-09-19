@@ -1,8 +1,9 @@
 "use server";
 
 import "server-only";
-import { noul, TypeSafeClient } from "@typesafe-ai/sdk";
+import { noul, type TypeSafeClient } from "@typesafe-ai/sdk";
 import { TICKETS } from "@/lib/data";
+import { requireClient } from "@/lib/typesafe-client";
 
 export interface TicketResult {
   id: number;
@@ -65,8 +66,8 @@ function buildTicketList(extraTicketTexts: string[]) {
   return [...TICKETS, ...extras];
 }
 
-export async function runSequential(extraTicketTexts: string[] = []): Promise<RunResult> {
-  const client = new TypeSafeClient();
+export async function runSequential(apiKey: string, extraTicketTexts: string[] = []): Promise<RunResult> {
+  const client = requireClient(apiKey);
   const tickets = buildTicketList(extraTicketTexts);
   const start = performance.now();
   const rows: Awaited<ReturnType<typeof judgeOne>>[] = [];
@@ -76,8 +77,8 @@ export async function runSequential(extraTicketTexts: string[] = []): Promise<Ru
   return summarize(rows, performance.now() - start);
 }
 
-export async function runParallel(extraTicketTexts: string[] = []): Promise<RunResult> {
-  const client = new TypeSafeClient();
+export async function runParallel(apiKey: string, extraTicketTexts: string[] = []): Promise<RunResult> {
+  const client = requireClient(apiKey);
   const tickets = buildTicketList(extraTicketTexts);
   const start = performance.now();
   const rows = await Promise.all(tickets.map((ticket) => judgeOne(client, ticket)));

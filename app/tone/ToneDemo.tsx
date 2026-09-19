@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { runToneCheck, runToneCheckCustom, type NoteResult } from "./actions";
 import { NOTES } from "@/lib/data";
+import { useApiKey } from "@/lib/api-key-context";
 
 const MAX_SCORE = 3;
 
@@ -44,6 +45,7 @@ function Meter({ result }: { result: NoteResult }) {
 }
 
 function TryYourOwn() {
+  const { apiKey } = useApiKey();
   const [text, setText] = useState("");
   const [context, setContext] = useState("");
   const [result, setResult] = useState<NoteResult | null>(null);
@@ -54,7 +56,7 @@ function TryYourOwn() {
     setError(null);
     startTransition(async () => {
       try {
-        setResult(await runToneCheckCustom(text, context));
+        setResult(await runToneCheckCustom(apiKey, text, context));
       } catch (e) {
         setError(e instanceof Error ? e.message : "Something went wrong calling TypeSafe.");
       }
@@ -82,7 +84,7 @@ function TryYourOwn() {
         />
         <button
           onClick={run}
-          disabled={pending || !text.trim()}
+          disabled={pending || !text.trim() || !apiKey}
           className="self-start rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           style={{ backgroundColor: "var(--series-2)" }}
         >
@@ -106,6 +108,7 @@ function TryYourOwn() {
 }
 
 export default function ToneDemo() {
+  const { apiKey } = useApiKey();
   const [results, setResults] = useState<NoteResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -114,7 +117,7 @@ export default function ToneDemo() {
     setError(null);
     startTransition(async () => {
       try {
-        setResults(await runToneCheck());
+        setResults(await runToneCheck(apiKey));
       } catch (e) {
         setError(e instanceof Error ? e.message : "Something went wrong calling TypeSafe.");
       }
@@ -129,7 +132,7 @@ export default function ToneDemo() {
 
       <button
         onClick={run}
-        disabled={pending}
+        disabled={pending || !apiKey}
         className="self-start rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         style={{ backgroundColor: "var(--series-1)" }}
       >

@@ -1,8 +1,9 @@
 "use server";
 
 import "server-only";
-import { choice, TypeSafeClient } from "@typesafe-ai/sdk";
+import { choice, type TypeSafeClient } from "@typesafe-ai/sdk";
 import { CLAIMS, SOURCES } from "@/lib/data";
+import { requireClient } from "@/lib/typesafe-client";
 
 export type Verdict = "supports" | "contradicts" | "says_nothing";
 
@@ -52,20 +53,24 @@ async function checkOne(client: TypeSafeClient, item: (typeof CLAIMS)[number]): 
   return { id: item.id, claim: item.claim, source: item.source, ...judged };
 }
 
-export async function runCitationCheck(): Promise<ClaimResult[]> {
-  const client = new TypeSafeClient();
+export async function runCitationCheck(apiKey: string): Promise<ClaimResult[]> {
+  const client = requireClient(apiKey);
   return Promise.all(CLAIMS.map((item) => checkOne(client, item)));
 }
 
 const MAX_INPUT_LENGTH = 2000;
 
-export async function checkCustomClaim(claim: string, sourceText: string): Promise<ClaimResult> {
+export async function checkCustomClaim(
+  apiKey: string,
+  claim: string,
+  sourceText: string,
+): Promise<ClaimResult> {
+  const client = requireClient(apiKey);
   const trimmedClaim = claim.trim().slice(0, MAX_INPUT_LENGTH);
   const trimmedSource = sourceText.trim().slice(0, MAX_INPUT_LENGTH);
   if (!trimmedClaim) throw new Error("Enter a claim to check.");
   if (!trimmedSource) throw new Error("Enter the source text to check it against.");
 
-  const client = new TypeSafeClient();
   const judged = await checkAgainstSource(client, trimmedClaim, trimmedSource);
   return { id: -1, claim: trimmedClaim, source: "your source", ...judged };
 }

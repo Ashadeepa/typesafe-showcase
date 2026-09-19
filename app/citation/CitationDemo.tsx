@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { checkCustomClaim, runCitationCheck, type ClaimResult, type Verdict } from "./actions";
 import { SOURCES, CONFIDENCE_THRESHOLD } from "@/lib/data";
+import { useApiKey } from "@/lib/api-key-context";
 
 const VERDICT_META: Record<Verdict, { label: string; icon: string; color: string }> = {
   supports: { label: "Supports", icon: "✓", color: "var(--status-good)" },
@@ -28,6 +29,7 @@ function VerdictBadge({ verdict, confidence }: { verdict: Verdict; confidence: n
 }
 
 function TryYourOwn() {
+  const { apiKey } = useApiKey();
   const [claim, setClaim] = useState("");
   const [sourceText, setSourceText] = useState("");
   const [result, setResult] = useState<ClaimResult | null>(null);
@@ -38,7 +40,7 @@ function TryYourOwn() {
     setError(null);
     startTransition(async () => {
       try {
-        setResult(await checkCustomClaim(claim, sourceText));
+        setResult(await checkCustomClaim(apiKey, claim, sourceText));
       } catch (e) {
         setError(e instanceof Error ? e.message : "Something went wrong calling TypeSafe.");
       }
@@ -67,7 +69,7 @@ function TryYourOwn() {
         />
         <button
           onClick={run}
-          disabled={pending || !claim.trim() || !sourceText.trim()}
+          disabled={pending || !claim.trim() || !sourceText.trim() || !apiKey}
           className="self-start rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           style={{ backgroundColor: "var(--series-2)" }}
         >
@@ -92,6 +94,7 @@ function TryYourOwn() {
 }
 
 export default function CitationDemo() {
+  const { apiKey } = useApiKey();
   const [results, setResults] = useState<ClaimResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -100,7 +103,7 @@ export default function CitationDemo() {
     setError(null);
     startTransition(async () => {
       try {
-        setResults(await runCitationCheck());
+        setResults(await runCitationCheck(apiKey));
       } catch (e) {
         setError(e instanceof Error ? e.message : "Something went wrong calling TypeSafe.");
       }
@@ -129,7 +132,7 @@ export default function CitationDemo() {
 
       <button
         onClick={run}
-        disabled={pending}
+        disabled={pending || !apiKey}
         className="self-start rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         style={{ backgroundColor: "var(--series-1)" }}
       >
