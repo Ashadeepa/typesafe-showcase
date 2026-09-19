@@ -46,6 +46,36 @@ export const SOURCES: Record<string, string> = {
     "damage or water damage. Extended warranties can be purchased separately within 30 days of purchase.",
 };
 
+export interface Note {
+  id: number;
+  text: string;
+  context: string;
+}
+
+// Fun one: real-life passive-aggressive notes/messages, scored on an escalation rubric.
+export const NOTES: Note[] = [
+  { id: 1, context: "Slack DM to a teammate",
+    text: "Hey! Just a friendly reminder that the dishes are in the sink. No worries, whenever you get a chance :)" },
+  { id: 2, context: "Reply-all email",
+    text: "Thanks so much for finally taking out the trash!! Really appreciate you stepping up." },
+  { id: 3, context: "Performance review comment",
+    text: "Great job on the report this quarter. Solid, clear work." },
+  { id: 4, context: "Meeting follow-up email",
+    text: "Per my last email, the meeting is at 3pm." },
+  { id: 5, context: "Group chat after a mix-up",
+    text: "Sure, I'll just redo the whole thing myself then, since apparently that's easier for everyone." },
+  { id: 6, context: "Roommate note on the fridge",
+    text: "I love how you always leave your dishes for ME to clean up. So thoughtful of you." },
+  { id: 7, context: "Text to a friend",
+    text: "Happy to help anytime you need, seriously!" },
+  { id: 8, context: "Office kitchen sign",
+    text: "Wow, must be nice to leave early every day while the rest of us stay late." },
+  { id: 9, context: "Slack DM checking on a task",
+    text: "Just checking in on the status of this — whenever you have a moment, no pressure!" },
+  { id: 10, context: "Text after being left on read",
+    text: "Oh, you're alive! Good to know, I guess." },
+];
+
 export const CLAIMS: Claim[] = [
   { id: 1, source: "refund-policy",
     claim: "Refunds are processed within 5 business days back to your original payment method." },

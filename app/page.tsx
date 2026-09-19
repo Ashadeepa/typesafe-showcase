@@ -17,6 +17,14 @@ const USE_CASES = [
     description:
       "A hallucination detector: verifies whether a claim is actually supported by the policy document it cites.",
   },
+  {
+    href: "/vibe",
+    title: "Passive-aggressiveness meter",
+    primitive: "Score",
+    color: "var(--status-serious)",
+    description:
+      "10 notes and messages, rated on an escalation rubric from sincere to full passive-aggressive weaponry.",
+  },
 ] as const;
 
 export default function Home() {

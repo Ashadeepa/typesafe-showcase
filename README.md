@@ -1,6 +1,6 @@
 # typesafe-showcase
 
-A Next.js UI for showing & telling two [TypeSafe](https://docs.typesafe.ai) System One (Jev)
+A Next.js UI for showing & telling [TypeSafe](https://docs.typesafe.ai) System One (Jev)
 use cases, deployable to Vercel. All TypeSafe calls run server-side (Server Actions) — the API
 key never reaches the browser.
 
@@ -14,6 +14,9 @@ key never reaches the browser.
 - **`/citation`** — a hallucination detector: 8 claims checked against the policy documents they
   cite, using a 3-way `Choice` (`supports` / `contradicts` / `says_nothing`) instead of a plain
   yes/no.
+- **`/vibe`** — the passive-aggressiveness meter: 10 notes and messages scored on an escalation
+  rubric (`Score`, 4 levels: good / warning / serious / critical) from a plain, sincere statement
+  to full passive-aggressive weaponry, sorted worst-to-best with a "most passive-aggressive" crown.
 
 Ported from the Python demos in [typesafe-jev-model-use-cases](https://github.com/Ashadeepa/typesafe-jev-model-use-cases).
 
