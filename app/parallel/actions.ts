@@ -53,19 +53,33 @@ function summarize(rows: Awaited<ReturnType<typeof judgeOne>>[], elapsedMs: numb
   };
 }
 
-export async function runSequential(): Promise<RunResult> {
+const MAX_EXTRA_TICKETS = 10;
+const MAX_TICKET_LENGTH = 500;
+
+function buildTicketList(extraTicketTexts: string[]) {
+  const extras = extraTicketTexts
+    .map((t) => t.trim().slice(0, MAX_TICKET_LENGTH))
+    .filter(Boolean)
+    .slice(0, MAX_EXTRA_TICKETS)
+    .map((text, i) => ({ id: 1000 + i, text }));
+  return [...TICKETS, ...extras];
+}
+
+export async function runSequential(extraTicketTexts: string[] = []): Promise<RunResult> {
   const client = new TypeSafeClient();
+  const tickets = buildTicketList(extraTicketTexts);
   const start = performance.now();
   const rows: Awaited<ReturnType<typeof judgeOne>>[] = [];
-  for (const ticket of TICKETS) {
+  for (const ticket of tickets) {
     rows.push(await judgeOne(client, ticket));
   }
   return summarize(rows, performance.now() - start);
 }
 
-export async function runParallel(): Promise<RunResult> {
+export async function runParallel(extraTicketTexts: string[] = []): Promise<RunResult> {
   const client = new TypeSafeClient();
+  const tickets = buildTicketList(extraTicketTexts);
   const start = performance.now();
-  const rows = await Promise.all(TICKETS.map((ticket) => judgeOne(client, ticket)));
+  const rows = await Promise.all(tickets.map((ticket) => judgeOne(client, ticket)));
   return summarize(rows, performance.now() - start);
 }

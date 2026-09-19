@@ -30,24 +30,42 @@ function relationQuestion() {
   );
 }
 
-async function checkOne(client: TypeSafeClient, item: (typeof CLAIMS)[number]): Promise<ClaimResult> {
-  const sourceText = SOURCES[item.source];
+async function checkAgainstSource(
+  client: TypeSafeClient,
+  claim: string,
+  sourceText: string,
+): Promise<Omit<ClaimResult, "id" | "claim" | "source">> {
   const response = await client.systemOne({
-    state: { source: sourceText, claim: item.claim },
+    state: { source: sourceText, claim },
     questions: { [QUESTION_ID]: relationQuestion() },
   });
   const answer = response.answers[QUESTION_ID];
   return {
-    id: item.id,
-    claim: item.claim,
-    source: item.source,
     verdict: answer.choice as Verdict,
     confidence: answer.confidence,
     probabilities: answer.probabilities as Record<Verdict, number>,
   };
 }
 
+async function checkOne(client: TypeSafeClient, item: (typeof CLAIMS)[number]): Promise<ClaimResult> {
+  const judged = await checkAgainstSource(client, item.claim, SOURCES[item.source]);
+  return { id: item.id, claim: item.claim, source: item.source, ...judged };
+}
+
 export async function runCitationCheck(): Promise<ClaimResult[]> {
   const client = new TypeSafeClient();
   return Promise.all(CLAIMS.map((item) => checkOne(client, item)));
+}
+
+const MAX_INPUT_LENGTH = 2000;
+
+export async function checkCustomClaim(claim: string, sourceText: string): Promise<ClaimResult> {
+  const trimmedClaim = claim.trim().slice(0, MAX_INPUT_LENGTH);
+  const trimmedSource = sourceText.trim().slice(0, MAX_INPUT_LENGTH);
+  if (!trimmedClaim) throw new Error("Enter a claim to check.");
+  if (!trimmedSource) throw new Error("Enter the source text to check it against.");
+
+  const client = new TypeSafeClient();
+  const judged = await checkAgainstSource(client, trimmedClaim, trimmedSource);
+  return { id: -1, claim: trimmedClaim, source: "your source", ...judged };
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { runCitationCheck, type ClaimResult, type Verdict } from "./actions";
+import { checkCustomClaim, runCitationCheck, type ClaimResult, type Verdict } from "./actions";
 import { SOURCES, CONFIDENCE_THRESHOLD } from "@/lib/data";
 
 const VERDICT_META: Record<Verdict, { label: string; icon: string; color: string }> = {
@@ -24,6 +24,70 @@ function VerdictBadge({ verdict, confidence }: { verdict: Verdict; confidence: n
       <span className="tabular-nums text-ink-muted">{confidence.toFixed(2)}</span>
       {lowConfidence && <span aria-hidden style={{ color: "var(--status-warning)" }}>⚠</span>}
     </span>
+  );
+}
+
+function TryYourOwn() {
+  const [claim, setClaim] = useState("");
+  const [sourceText, setSourceText] = useState("");
+  const [result, setResult] = useState<ClaimResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const run = () => {
+    setError(null);
+    startTransition(async () => {
+      try {
+        setResult(await checkCustomClaim(claim, sourceText));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Something went wrong calling TypeSafe.");
+      }
+    });
+  };
+
+  return (
+    <div className="rounded-lg border border-border-hairline bg-chart-surface p-5">
+      <h2 className="mb-3 text-sm font-semibold text-ink-primary">Try your own</h2>
+      <div className="flex flex-col gap-2">
+        <textarea
+          value={sourceText}
+          onChange={(e) => setSourceText(e.target.value)}
+          maxLength={2000}
+          rows={3}
+          placeholder="Paste the source text (a policy, a document excerpt, anything)…"
+          className="w-full rounded-md border border-border-hairline bg-transparent p-2 text-sm text-ink-primary placeholder:text-ink-muted"
+        />
+        <textarea
+          value={claim}
+          onChange={(e) => setClaim(e.target.value)}
+          maxLength={2000}
+          rows={2}
+          placeholder="Paste the claim to check against it…"
+          className="w-full rounded-md border border-border-hairline bg-transparent p-2 text-sm text-ink-primary placeholder:text-ink-muted"
+        />
+        <button
+          onClick={run}
+          disabled={pending || !claim.trim() || !sourceText.trim()}
+          className="self-start rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          style={{ backgroundColor: "var(--series-2)" }}
+        >
+          {pending ? "Checking…" : "Check it"}
+        </button>
+      </div>
+
+      {error && (
+        <p className="mt-3 text-sm" style={{ color: "var(--status-critical)" }}>
+          ⚠ {error}
+        </p>
+      )}
+
+      {result && (
+        <div className="mt-4 flex items-start justify-between gap-4 border-t border-gridline pt-4">
+          <p className="text-sm text-ink-primary">&ldquo;{result.claim}&rdquo;</p>
+          <VerdictBadge verdict={result.verdict} confidence={result.confidence} />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -60,6 +124,8 @@ export default function CitationDemo() {
           ))}
         </dl>
       </div>
+
+      <TryYourOwn />
 
       <button
         onClick={run}

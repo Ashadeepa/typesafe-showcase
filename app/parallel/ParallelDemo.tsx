@@ -44,11 +44,23 @@ function TimingChart({ sequential, parallel }: { sequential: RunResult; parallel
   );
 }
 
-function TicketRow({ id, text, noulValue }: { id: number; text: string; noulValue: number | undefined }) {
+function TicketRow({
+  id,
+  text,
+  noulValue,
+  custom,
+}: {
+  id: number;
+  text: string;
+  noulValue: number | undefined;
+  custom?: boolean;
+}) {
   const isBilling = (noulValue ?? 0) > 0.5;
   return (
     <li className="flex items-start gap-3 border-b border-gridline py-2 last:border-0">
-      <span className="mt-0.5 w-6 shrink-0 text-sm tabular-nums text-ink-muted">{id}</span>
+      <span className="mt-0.5 w-6 shrink-0 text-sm tabular-nums text-ink-muted">
+        {custom ? "★" : id}
+      </span>
       <span className="flex-1 text-sm text-ink-primary">{text}</span>
       {noulValue !== undefined ? (
         <span
@@ -68,18 +80,36 @@ function TicketRow({ id, text, noulValue }: { id: number; text: string; noulValu
   );
 }
 
+const MAX_EXTRA_TICKETS = 10;
+
 export default function ParallelDemo() {
   const [runs, setRuns] = useState<RunState>({ sequential: null, parallel: null });
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [activeRun, setActiveRun] = useState<"sequential" | "parallel" | null>(null);
+  const [customTickets, setCustomTickets] = useState<string[]>([]);
+  const [newTicketText, setNewTicketText] = useState("");
+
+  const addTicket = () => {
+    const text = newTicketText.trim();
+    if (!text || customTickets.length >= MAX_EXTRA_TICKETS) return;
+    setCustomTickets((prev) => [...prev, text]);
+    setNewTicketText("");
+    setRuns({ sequential: null, parallel: null });
+  };
+
+  const removeTicket = (index: number) => {
+    setCustomTickets((prev) => prev.filter((_, i) => i !== index));
+    setRuns({ sequential: null, parallel: null });
+  };
 
   const trigger = (kind: "sequential" | "parallel") => {
     setError(null);
     setActiveRun(kind);
     startTransition(async () => {
       try {
-        const result = kind === "sequential" ? await runSequential() : await runParallel();
+        const result =
+          kind === "sequential" ? await runSequential(customTickets) : await runParallel(customTickets);
         setRuns((prev) => ({ ...prev, [kind]: result }));
       } catch (e) {
         setError(e instanceof Error ? e.message : "Something went wrong calling TypeSafe.");
@@ -92,8 +122,52 @@ export default function ParallelDemo() {
     noulById.set(r.id, r.isBillingNoul);
   }
 
+  const allTickets = [
+    ...TICKETS,
+    ...customTickets.map((text, i) => ({ id: 1000 + i, text, custom: true })),
+  ];
+
   return (
     <div className="flex flex-col gap-6">
+      <div className="rounded-lg border border-border-hairline bg-chart-surface p-4">
+        <h2 className="mb-3 text-sm font-semibold text-ink-primary">Add your own ticket</h2>
+        <div className="flex flex-wrap gap-2">
+          <input
+            value={newTicketText}
+            onChange={(e) => setNewTicketText(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && addTicket()}
+            maxLength={500}
+            disabled={customTickets.length >= MAX_EXTRA_TICKETS}
+            placeholder="Type a support ticket to add to the batch…"
+            className="min-w-0 flex-1 rounded-md border border-border-hairline bg-transparent p-2 text-sm text-ink-primary placeholder:text-ink-muted"
+          />
+          <button
+            onClick={addTicket}
+            disabled={!newTicketText.trim() || customTickets.length >= MAX_EXTRA_TICKETS}
+            className="rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            style={{ backgroundColor: "var(--series-2)" }}
+          >
+            Add
+          </button>
+        </div>
+        {customTickets.length > 0 && (
+          <ul className="mt-3 flex flex-col gap-1.5">
+            {customTickets.map((text, i) => (
+              <li key={i} className="flex items-center gap-2 text-sm text-ink-secondary">
+                <button
+                  onClick={() => removeTicket(i)}
+                  aria-label="Remove ticket"
+                  className="text-ink-muted hover:text-ink-primary"
+                >
+                  ✕
+                </button>
+                {text}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       <div className="flex flex-wrap gap-3">
         <button
           onClick={() => trigger("sequential")}
@@ -122,14 +196,22 @@ export default function ParallelDemo() {
       {runs.sequential && runs.parallel && <TimingChart sequential={runs.sequential} parallel={runs.parallel} />}
 
       <div className="rounded-lg border border-border-hairline bg-chart-surface p-5">
-        <h2 className="mb-2 text-sm font-semibold text-ink-primary">16 sample support tickets</h2>
+        <h2 className="mb-2 text-sm font-semibold text-ink-primary">
+          {TICKETS.length} sample support tickets{customTickets.length > 0 && ` + ${customTickets.length} of your own`}
+        </h2>
         <p className="mb-3 text-xs text-ink-muted">
           Run a check above to see each ticket judged "is this about billing?" — the badge shows the
           model&rsquo;s probability (Noul), not a keyword match.
         </p>
         <ul>
-          {TICKETS.map((t) => (
-            <TicketRow key={t.id} id={t.id} text={t.text} noulValue={noulById.get(t.id)} />
+          {allTickets.map((t) => (
+            <TicketRow
+              key={t.id}
+              id={t.id}
+              text={t.text}
+              noulValue={noulById.get(t.id)}
+              custom={"custom" in t}
+            />
           ))}
         </ul>
       </div>

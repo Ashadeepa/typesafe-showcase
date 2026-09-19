@@ -56,3 +56,14 @@ export async function runToneCheck(): Promise<NoteResult[]> {
   const results = await Promise.all(NOTES.map((note) => judgeOne(client, note)));
   return results.sort((a, b) => b.score - a.score);
 }
+
+const MAX_INPUT_LENGTH = 500;
+
+export async function runToneCheckCustom(text: string, context: string): Promise<NoteResult> {
+  const trimmedText = text.trim().slice(0, MAX_INPUT_LENGTH);
+  if (!trimmedText) throw new Error("Enter a message to check.");
+  const trimmedContext = context.trim().slice(0, MAX_INPUT_LENGTH) || "Custom input";
+
+  const client = new TypeSafeClient();
+  return judgeOne(client, { id: -1, text: trimmedText, context: trimmedContext });
+}

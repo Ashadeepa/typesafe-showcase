@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { runToneCheck, type NoteResult } from "./actions";
+import { runToneCheck, runToneCheckCustom, type NoteResult } from "./actions";
 import { NOTES } from "@/lib/data";
 
 const MAX_SCORE = 3;
@@ -43,6 +43,68 @@ function Meter({ result }: { result: NoteResult }) {
   );
 }
 
+function TryYourOwn() {
+  const [text, setText] = useState("");
+  const [context, setContext] = useState("");
+  const [result, setResult] = useState<NoteResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const run = () => {
+    setError(null);
+    startTransition(async () => {
+      try {
+        setResult(await runToneCheckCustom(text, context));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Something went wrong calling TypeSafe.");
+      }
+    });
+  };
+
+  return (
+    <div className="rounded-lg border border-border-hairline bg-chart-surface p-4">
+      <h2 className="mb-3 text-sm font-semibold text-ink-primary">Try your own</h2>
+      <div className="flex flex-col gap-2">
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          maxLength={500}
+          rows={2}
+          placeholder="Paste a message or note…"
+          className="w-full rounded-md border border-border-hairline bg-transparent p-2 text-sm text-ink-primary placeholder:text-ink-muted"
+        />
+        <input
+          value={context}
+          onChange={(e) => setContext(e.target.value)}
+          maxLength={500}
+          placeholder="Where was it said? (optional, e.g. &quot;text from my roommate&quot;)"
+          className="w-full rounded-md border border-border-hairline bg-transparent p-2 text-sm text-ink-primary placeholder:text-ink-muted"
+        />
+        <button
+          onClick={run}
+          disabled={pending || !text.trim()}
+          className="self-start rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          style={{ backgroundColor: "var(--series-2)" }}
+        >
+          {pending ? "Checking…" : "Check it"}
+        </button>
+      </div>
+
+      {error && (
+        <p className="mt-3 text-sm" style={{ color: "var(--status-critical)" }}>
+          ⚠ {error}
+        </p>
+      )}
+
+      {result && (
+        <div className="mt-3">
+          <Meter result={result} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ToneDemo() {
   const [results, setResults] = useState<NoteResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +125,8 @@ export default function ToneDemo() {
 
   return (
     <div className="flex flex-col gap-6">
+      <TryYourOwn />
+
       <button
         onClick={run}
         disabled={pending}
