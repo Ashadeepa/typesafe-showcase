@@ -51,7 +51,7 @@ async function judgeOne(client: TypeSafeClient, note: (typeof NOTES)[number]): P
   };
 }
 
-export async function runVibeCheck(): Promise<NoteResult[]> {
+export async function runToneCheck(): Promise<NoteResult[]> {
   const client = new TypeSafeClient();
   const results = await Promise.all(NOTES.map((note) => judgeOne(client, note)));
   return results.sort((a, b) => b.score - a.score);

@@ -14,7 +14,7 @@ key never reaches the browser.
 - **`/citation`** — a hallucination detector: 8 claims checked against the policy documents they
   cite, using a 3-way `Choice` (`supports` / `contradicts` / `says_nothing`) instead of a plain
   yes/no.
-- **`/vibe`** — the passive-aggressiveness meter: 10 notes and messages scored on an escalation
+- **`/tone`** — the passive-aggressiveness meter: 10 notes and messages scored on an escalation
   rubric (`Score`, 4 levels: good / warning / serious / critical) from a plain, sincere statement
   to full passive-aggressive weaponry, sorted worst-to-best with a "most passive-aggressive" crown.
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { runVibeCheck, type NoteResult } from "./actions";
+import { runToneCheck, type NoteResult } from "./actions";
 import { NOTES } from "@/lib/data";
 
 const MAX_SCORE = 3;
@@ -43,7 +43,7 @@ function Meter({ result }: { result: NoteResult }) {
   );
 }
 
-export default function VibeDemo() {
+export default function ToneDemo() {
   const [results, setResults] = useState<NoteResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -52,7 +52,7 @@ export default function VibeDemo() {
     setError(null);
     startTransition(async () => {
       try {
-        setResults(await runVibeCheck());
+        setResults(await runToneCheck());
       } catch (e) {
         setError(e instanceof Error ? e.message : "Something went wrong calling TypeSafe.");
       }

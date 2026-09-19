@@ -1,11 +1,11 @@
 import Link from "next/link";
-import VibeDemo from "./VibeDemo";
+import ToneDemo from "./ToneDemo";
 
 export const metadata = {
   title: "Passive-aggressiveness meter — TypeSafe use cases",
 };
 
-export default function VibePage() {
+export default function TonePage() {
   return (
     <main className="mx-auto max-w-2xl px-4 py-10">
       <Link href="/" className="text-sm text-ink-muted hover:text-ink-primary">
@@ -19,7 +19,7 @@ export default function VibePage() {
         sincere statement to full passive-aggressive weaponry — sorted worst-to-best once you run it.
       </p>
       <div className="mt-6">
-        <VibeDemo />
+        <ToneDemo />
       </div>
     </main>
   );
