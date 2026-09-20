@@ -23,11 +23,6 @@ the deployment.
 - **`/tone`** — the passive-aggressiveness meter: 10 notes and messages scored on an escalation
   rubric (`Score`, 4 levels: good / warning / serious / critical) from a plain, sincere statement
   to full passive-aggressive weaponry, sorted worst-to-best with a "most passive-aggressive" crown.
-- **`/triage`** — Triage Tetris: a support ticket falls, you steer it into a lane (Billing / Bug /
-  Feature / Praise) before it lands, and Jev (`Choice`, 4-way) judges the real category the instant
-  it does — correct catches score points and speed up the next drop, wrong ones cost a life. The
-  live judgment call is the scoring mechanism, not a decoration on top of a game that already works
-  without it.
 
 Ported from the Python demos in [typesafe-jev-model-use-cases](https://github.com/Ashadeepa/typesafe-jev-model-use-cases).
 

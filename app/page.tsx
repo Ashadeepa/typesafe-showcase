@@ -25,14 +25,6 @@ const USE_CASES = [
     description:
       "10 notes and messages, rated on an escalation rubric from sincere to full passive-aggressive weaponry.",
   },
-  {
-    href: "/triage",
-    title: "Triage Tetris",
-    primitive: "Choice",
-    color: "var(--status-good)",
-    description:
-      "A ticket falls, you steer it into a lane, Jev judges the real category the instant it lands. Real-time scoring.",
-  },
 ] as const;
 
 export default function Home() {
