@@ -23,6 +23,9 @@ the deployment.
 - **`/tone`** — the passive-aggressiveness meter: 10 notes and messages scored on an escalation
   rubric (`Score`, 4 levels: good / warning / serious / critical) from a plain, sincere statement
   to full passive-aggressive weaponry, sorted worst-to-best with a "most passive-aggressive" crown.
+- **`/reflex`** — Reaction Match: guess "billing" or "not billing" on a ticket before Jev's own
+  `Noul` answer comes back. You're racing its real, measured response time (avg ~470ms in testing),
+  not a countdown — the opponent is Jev's actual latency, not a clock.
 
 Ported from the Python demos in [typesafe-jev-model-use-cases](https://github.com/Ashadeepa/typesafe-jev-model-use-cases).
 

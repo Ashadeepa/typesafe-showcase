@@ -25,6 +25,14 @@ const USE_CASES = [
     description:
       "10 notes and messages, rated on an escalation rubric from sincere to full passive-aggressive weaponry.",
   },
+  {
+    href: "/reflex",
+    title: "Reaction Match",
+    primitive: "Noul",
+    color: "var(--status-good)",
+    description:
+      "Guess billing or not before Jev's own answer comes back — you're racing its real response time, not a clock.",
+  },
 ] as const;
 
 export default function Home() {
