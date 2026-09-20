@@ -26,6 +26,11 @@ the deployment.
 - **`/reflex`** — Reaction Match: guess "billing" or "not billing" on a ticket before Jev's own
   `Noul` answer comes back. You're racing its real, measured response time (avg ~470ms in testing),
   not a countdown — the opponent is Jev's actual latency, not a clock.
+- **`/jenga`** — Sentence Jenga: pull one word at a time out of a sentence; after each pull Jev
+  judges (`Noul`) whether it still means what it started out meaning. The probability it returns
+  *is* the tower's structural integrity — so you watch the meter go from solid (~0.95 while
+  modifiers come out) to wobbling (~0.74 once the object goes) to collapse (~0.24 when the actor or
+  verb goes). Uses the model's uncertainty as the game mechanic, not just its answer.
 
 Ported from the Python demos in [typesafe-jev-model-use-cases](https://github.com/Ashadeepa/typesafe-jev-model-use-cases).
 

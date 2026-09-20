@@ -33,6 +33,14 @@ const USE_CASES = [
     description:
       "Guess billing or not before Jev's own answer comes back — you're racing its real response time, not a clock.",
   },
+  {
+    href: "/jenga",
+    title: "Sentence Jenga",
+    primitive: "Noul",
+    color: "var(--status-warning)",
+    description:
+      "Pull words out of a sentence one at a time. The probability Jev returns is the tower's structural integrity.",
+  },
 ] as const;
 
 export default function Home() {

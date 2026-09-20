@@ -86,3 +86,36 @@ body {
   color: var(--foreground);
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
+
+/* Sentence Jenga: the tower shakes while Jev decides, and tumbles when meaning breaks. */
+@keyframes jenga-wobble {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  20% { transform: translateX(-2px) rotate(-0.6deg); }
+  40% { transform: translateX(2px) rotate(0.5deg); }
+  60% { transform: translateX(-1.5px) rotate(-0.4deg); }
+  80% { transform: translateX(1.5px) rotate(0.3deg); }
+}
+
+@keyframes jenga-collapse {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(70px) rotate(var(--fall-rotate, 12deg)); opacity: 0; }
+}
+
+@keyframes jenga-settle {
+  0% { transform: translateY(-4px); }
+  60% { transform: translateY(1px); }
+  100% { transform: translateY(0); }
+}
+
+.jenga-wobble { animation: jenga-wobble 0.45s ease-in-out infinite; }
+.jenga-collapse { animation: jenga-collapse 0.7s cubic-bezier(0.4, 0, 1, 1) forwards; }
+.jenga-settle { animation: jenga-settle 0.3s ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .jenga-wobble,
+  .jenga-collapse,
+  .jenga-settle {
+    animation: none;
+  }
+  .jenga-collapse { opacity: 0.25; }
+}
