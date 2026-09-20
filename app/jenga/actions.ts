@@ -1,7 +1,7 @@
 "use server";
 
 import "server-only";
-import { noul } from "@typesafe-ai/sdk";
+import { choice, noul } from "@typesafe-ai/sdk";
 import { requireClient } from "@/lib/typesafe-client";
 import { COLLAPSE_THRESHOLD } from "@/lib/jenga-data";
 
@@ -43,4 +43,41 @@ export async function judgeRemoval(
   });
   const answer = response.answers[QUESTION_ID];
   return { holds: answer.noul > COLLAPSE_THRESHOLD, stability: answer.noul };
+}
+
+const PICK_ID = "pick";
+
+/**
+ * Jev's turn. It has to pull a word like any other player, so it picks the one it judges safest —
+ * which works fine until the safe words run out and it's forced into a load-bearing one.
+ */
+export async function chooseWord(
+  apiKey: string,
+  original: string,
+  current: string,
+  words: string[],
+): Promise<number> {
+  const client = requireClient(apiKey);
+  if (words.length === 0) throw new Error("No words left to choose from.");
+
+  const criteria: Record<string, string> = {};
+  words.forEach((w, i) => {
+    criteria[`w${i}`] = `Remove the word “${w}” (position ${i + 1}).`;
+  });
+
+  const response = await client.systemOne({
+    state: { sentence: current, original_meaning: original },
+    questions: {
+      [PICK_ID]: choice(
+        "You are playing a word-removal game. After removing one word, the sentence must still " +
+          "mean the same thing as `original_meaning`. Which single word is the SAFEST to remove — " +
+          "the one whose removal damages the core meaning least?",
+        criteria,
+      ),
+    },
+  });
+
+  const picked = Number(response.answers[PICK_ID].choice.replace(/^w/, ""));
+  // Defensive: never let an unexpected label stall the game.
+  return Number.isInteger(picked) && picked >= 0 && picked < words.length ? picked : 0;
 }

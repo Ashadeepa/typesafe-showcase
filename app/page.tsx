@@ -41,6 +41,14 @@ const USE_CASES = [
     description:
       "Pull words out of a sentence one at a time. The probability Jev returns is the tower's structural integrity.",
   },
+  {
+    href: "/bluff",
+    title: "Bluff",
+    primitive: "Noul",
+    color: "var(--status-critical)",
+    description:
+      "The classic bluffing card game against three AI opponents, each asking Jev how plausible your claim is before calling bluff.",
+  },
 ] as const;
 
 export default function Home() {
