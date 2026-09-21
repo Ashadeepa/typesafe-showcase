@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { judgeBluff } from "./actions";
+import { chooseAiPlay, judgeBluff } from "./actions";
 import { useApiKey } from "@/lib/api-key-context";
 
 type Suit = "spade" | "heart" | "diamond" | "club";
@@ -53,6 +53,9 @@ function actorLabel(p: PlayerState) {
 function actorPossessive(p: PlayerState) {
   return p.isHuman ? "Your" : `${p.name}'s`;
 }
+function verb(p: PlayerState, base: string) {
+  return p.isHuman ? base : `${base}s`;
+}
 
 // ---- Everything below is plain, non-component game-engine code: it never runs during React's
 // render pass, only from event handlers and effects, so it's free to be as impure as a card game
@@ -84,14 +87,33 @@ function dealNewGame(): GameState {
   return { players, pile: [], turnIndex: 0, requiredRankIndex: 0 };
 }
 
-function aiChooseCards(actor: PlayerState, claimed: string): Card[] {
+async function aiChooseCards(
+  apiKey: string,
+  actor: PlayerState,
+  claimed: string,
+  onError: (msg: string) => void,
+): Promise<Card[]> {
   const matching = actor.hand.filter((c) => c.rank === claimed);
   const other = actor.hand.filter((c) => c.rank !== claimed);
-  const useTruthful = matching.length > 0 && (other.length === 0 || Math.random() < 0.8);
-  const pool = useTruthful ? matching : other;
-  const maxN = Math.min(pool.length, 4);
-  const n = Math.min(maxN, 1 + Math.floor(Math.random() * maxN));
-  const toPlay = shuffle(pool).slice(0, n);
+
+  let bluff: boolean;
+  let count: number;
+  try {
+    const decision = await chooseAiPlay(apiKey, claimed, matching.length, other.length, actor.hand.length);
+    bluff = decision.bluff;
+    count = decision.count;
+  } catch (e) {
+    onError(e instanceof Error ? e.message : "The call to TypeSafe failed.");
+    bluff = matching.length === 0 || (other.length > 0 && Math.random() < 0.2);
+    const fallbackPool = bluff ? other : matching;
+    count = Math.min(fallbackPool.length, 1 + Math.floor(Math.random() * Math.min(fallbackPool.length, 4)));
+  }
+
+  const pool = bluff ? other : matching;
+  // A stale or malformed answer must never leave the player with nothing to play.
+  const safePool = pool.length > 0 ? pool : matching.length > 0 ? matching : other;
+  const n = Math.min(Math.max(count, 1), safePool.length, 4);
+  const toPlay = shuffle(safePool).slice(0, n);
   toPlay.forEach((c) => {
     const idx = actor.hand.indexOf(c);
     actor.hand.splice(idx, 1);
@@ -138,14 +160,14 @@ async function offerBluffCall(players: PlayerState[], actor: PlayerState, play: 
 }
 
 function resolveBluffCall(g: GameState, caller: PlayerState, actor: PlayerState, play: Play, appendLog: EngineCallbacks["appendLog"]) {
-  appendLog(`${actorLabel(caller)} calls bluff on ${actorLabel(actor)}!`, "warn");
+  appendLog(`${actorLabel(caller)} ${verb(caller, "call")} bluff on ${actorLabel(actor)}!`, "warn");
   const allTrue = play.cards.every((c) => c.rank === play.claimedRank);
   const shown = play.cards.map((c) => c.rank + SUIT_SYMBOL[c.suit]).join(" ");
   if (allTrue) {
-    appendLog(`The cards were ${shown} — true to the claim. ${actorLabel(caller)} takes the whole pile (${g.pile.length} cards).`);
+    appendLog(`The cards were ${shown} — true to the claim. ${actorLabel(caller)} ${verb(caller, "take")} the whole pile (${g.pile.length} cards).`);
     caller.hand.push(...g.pile);
   } else {
-    appendLog(`The cards were ${shown} — not all ${PLURAL[play.claimedRank]}. Caught! ${actorLabel(actor)} takes the whole pile (${g.pile.length} cards).`, "warn");
+    appendLog(`The cards were ${shown} — not all ${PLURAL[play.claimedRank]}. Caught! ${actorLabel(actor)} ${verb(actor, "take")} the whole pile (${g.pile.length} cards).`, "warn");
     actor.hand.push(...g.pile);
   }
   g.pile = [];
@@ -164,8 +186,8 @@ async function playTurn(
     cards = await humanSelectCards();
   } else {
     cb.setStatus(actor.id, "deciding…");
-    await sleep(500 + Math.random() * 400);
-    cards = aiChooseCards(actor, claimed);
+    await sleep(300 + Math.random() * 300);
+    cards = await aiChooseCards(apiKey, actor, claimed, cb.onError);
     cb.setStatus(actor.id, "");
   }
   actor.hand = actor.hand.filter((c) => !cards.includes(c));
