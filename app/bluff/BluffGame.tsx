@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { chooseAiPlay, judgeBluff } from "./actions";
-import { judgeBluffGemini } from "./gemini-actions";
+import { judgeBluffCompare } from "./compare-actions";
 import { useApiKey } from "@/lib/api-key-context";
-import { useGeminiKey } from "@/lib/gemini-key-context";
+import { useCompareModel } from "@/lib/compare-key-context";
+import { PROVIDER_LABEL, type CompareProvider } from "@/lib/compare-model-shared";
 import styles from "./bluff.module.css";
 
 type Suit = "spade" | "heart" | "diamond" | "club";
@@ -37,16 +38,17 @@ interface EngineCallbacks {
   setStatus: (id: number, text: string) => void;
   askYesNo: (body: string) => Promise<boolean>;
   onError: (msg: string) => void;
-  geminiApiKey: string;
+  compareProvider: CompareProvider;
+  compareApiKey: string;
   onCompare: (entry: CompareEntry) => void;
 }
 interface CompareEntry {
   jevMs: number;
   jevProbability: number;
-  geminiMs?: number;
-  geminiProbability?: number;
-  geminiCostUsd?: number;
-  geminiError?: string;
+  otherMs?: number;
+  otherProbability?: number;
+  otherCostUsd?: number;
+  otherError?: string;
 }
 
 const SUITS: Suit[] = ["spade", "heart", "diamond", "club"];
@@ -139,7 +141,8 @@ async function decideAiCall(
   observer: PlayerState,
   play: Play,
   onError: (msg: string) => void,
-  geminiApiKey: string,
+  compareProvider: CompareProvider,
+  compareApiKey: string,
   onCompare: (entry: CompareEntry) => void,
 ): Promise<boolean> {
   const ownCount = observer.hand.filter((c) => c.rank === play.claimedRank).length;
@@ -159,20 +162,21 @@ async function decideAiCall(
   const jevMs = performance.now() - jevStart;
 
   // Fire-and-forget: the comparison is purely informational and must never slow the AI down or
-  // affect the outcome — Gemini's answer is reported side by side, not consulted for the call.
-  if (geminiApiKey) {
-    judgeBluffGemini(geminiApiKey, play.claimedRank, play.cards.length, ownCount)
-      .then((g) =>
+  // affect the outcome — the other model's answer is reported side by side, not consulted for
+  // the call.
+  if (compareApiKey) {
+    judgeBluffCompare(compareProvider, compareApiKey, play.claimedRank, play.cards.length, ownCount)
+      .then((other) =>
         onCompare({
           jevMs,
           jevProbability: bluffProbability,
-          geminiMs: g.latencyMs,
-          geminiProbability: g.bluffProbability,
-          geminiCostUsd: g.costUsd,
+          otherMs: other.latencyMs,
+          otherProbability: other.bluffProbability,
+          otherCostUsd: other.costUsd,
         }),
       )
       .catch((e) =>
-        onCompare({ jevMs, jevProbability: bluffProbability, geminiError: e instanceof Error ? e.message : "Gemini call failed." }),
+        onCompare({ jevMs, jevProbability: bluffProbability, otherError: e instanceof Error ? e.message : "Comparison call failed." }),
       );
   }
 
@@ -192,7 +196,7 @@ async function offerBluffCall(players: PlayerState[], actor: PlayerState, play: 
     } else {
       cb.setStatus(p.id, "weighing the claim…");
       await sleep(300 + Math.random() * 300);
-      willCall = await decideAiCall(apiKey, p, play, cb.onError, cb.geminiApiKey, cb.onCompare);
+      willCall = await decideAiCall(apiKey, p, play, cb.onError, cb.compareProvider, cb.compareApiKey, cb.onCompare);
       cb.setStatus(p.id, "");
       if (willCall) cb.appendLog(`${p.name} eyes the pile with suspicion…`);
     }
@@ -274,17 +278,17 @@ function average(arr: number[]) {
   return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
 }
 
-function ComparePanel({ entries }: { entries: CompareEntry[] }) {
+function ComparePanel({ entries, providerLabel }: { entries: CompareEntry[]; providerLabel: string }) {
   const jevTimes = entries.map((e) => e.jevMs);
-  const geminiEntries = entries.filter((e) => e.geminiMs !== undefined);
-  const geminiTimes = geminiEntries.map((e) => e.geminiMs as number);
-  const totalCost = geminiEntries.reduce((sum, e) => sum + (e.geminiCostUsd ?? 0), 0);
+  const otherEntries = entries.filter((e) => e.otherMs !== undefined);
+  const otherTimes = otherEntries.map((e) => e.otherMs as number);
+  const totalCost = otherEntries.reduce((sum, e) => sum + (e.otherCostUsd ?? 0), 0);
   const last = entries[entries.length - 1];
 
   return (
     <div className={styles.comparePanel}>
       <div className={styles.compareHeader}>
-        <span>Jev vs Gemini 3.5 Flash-Lite</span>
+        <span>Jev vs {providerLabel}</span>
         <span className={styles.compareCount}>{entries.length} compared</span>
       </div>
       <div className={styles.compareSummary}>
@@ -293,20 +297,20 @@ function ComparePanel({ entries }: { entries: CompareEntry[] }) {
           <span className={styles.compareStat}>{average(jevTimes).toFixed(0)}ms avg</span>
         </div>
         <div className={styles.compareRow}>
-          <span className={styles.compareModelName}>Gemini</span>
+          <span className={styles.compareModelName}>{providerLabel}</span>
           <span className={styles.compareStat}>
-            {geminiTimes.length ? `${average(geminiTimes).toFixed(0)}ms avg` : "pending…"} · ${totalCost.toFixed(5)} total
+            {otherTimes.length ? `${average(otherTimes).toFixed(0)}ms avg` : "pending…"} · ${totalCost.toFixed(5)} total
           </span>
         </div>
       </div>
       {last && (
         <p className={styles.compareLast}>
           Last claim: Jev {last.jevProbability.toFixed(2)} ({last.jevMs.toFixed(0)}ms)
-          {last.geminiProbability !== undefined
-            ? ` vs Gemini ${last.geminiProbability.toFixed(2)} (${(last.geminiMs as number).toFixed(0)}ms)`
-            : last.geminiError
-              ? ` — Gemini error: ${last.geminiError}`
-              : " — Gemini pending…"}
+          {last.otherProbability !== undefined
+            ? ` vs ${providerLabel} ${last.otherProbability.toFixed(2)} (${(last.otherMs as number).toFixed(0)}ms)`
+            : last.otherError
+              ? ` — ${providerLabel} error: ${last.otherError}`
+              : ` — ${providerLabel} pending…`}
         </p>
       )}
     </div>
@@ -315,7 +319,7 @@ function ComparePanel({ entries }: { entries: CompareEntry[] }) {
 
 export default function BluffGame() {
   const { apiKey } = useApiKey();
-  const { geminiKey } = useGeminiKey();
+  const { provider, compareKey } = useCompareModel();
   const gameRef = useRef<GameState | null>(null);
   const runIdRef = useRef(0);
   const humanResolveRef = useRef<((cards: Card[]) => void) | null>(null);
@@ -393,7 +397,8 @@ export default function BluffGame() {
       setStatus: (id, text) => setStatusById((s) => ({ ...s, [id]: text })),
       askYesNo,
       onError: (msg) => setError(msg),
-      geminiApiKey: geminiKey,
+      compareProvider: provider,
+      compareApiKey: compareKey,
       onCompare: (entry) => setCompareLog((l) => [...l, entry].slice(-50)),
     };
     runLoop(
@@ -438,10 +443,10 @@ export default function BluffGame() {
           Deal cards
         </button>
         {!apiKey && <p className={styles.keyHint}>Enter your TypeSafe API key above to play.</p>}
-        {apiKey && !geminiKey && (
+        {apiKey && !compareKey && (
           <p className={styles.compareHint}>
-            Add a Gemini key in the bar above to compare every bluff-call judgment against Gemini
-            3.5 Flash-Lite side by side — it never affects gameplay.
+            Add a comparison key in the bar above to compare every bluff-call judgment against
+            Gemini or Claude side by side — it never affects gameplay.
           </p>
         )}
       </div>
@@ -474,8 +479,8 @@ export default function BluffGame() {
           </div>
         </div>
 
-        {geminiKey && compareLog.length > 0 && (
-          <ComparePanel entries={compareLog} />
+        {compareKey && compareLog.length > 0 && (
+          <ComparePanel entries={compareLog} providerLabel={PROVIDER_LABEL[provider]} />
         )}
 
         {prompt && (

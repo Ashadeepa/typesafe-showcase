@@ -2,8 +2,9 @@
 
 import "server-only";
 import { choice, noul } from "@typesafe-ai/sdk";
+import { z } from "zod";
 import { requireClient } from "@/lib/typesafe-client";
-import { askGemini } from "@/lib/gemini";
+import { askModel, type CompareProvider } from "@/lib/compare-model";
 import { COLLAPSE_THRESHOLD } from "@/lib/jenga-data";
 
 const QUESTION_ID = "holds";
@@ -83,14 +84,15 @@ export async function chooseWord(
   return Number.isInteger(picked) && picked >= 0 && picked < words.length ? picked : 0;
 }
 
-export interface GeminiPullVerdict {
+export interface ComparePullVerdict {
   holds: boolean;
   stability: number;
   latencyMs: number;
   costUsd: number;
 }
 
-const HOLDS_SCHEMA = {
+const HoldsSchema = z.object({ holds_probability: z.number() });
+const HOLDS_GEMINI_SCHEMA = {
   type: "object",
   properties: { holds_probability: { type: "number" } },
   required: ["holds_probability"],
@@ -107,11 +109,16 @@ function holdsPrompt(original: string, shortened: string) {
   );
 }
 
-/** Same holds-meaning judgment, asked of Gemini instead of Jev — purely for comparison. */
-export async function judgeRemovalGemini(geminiApiKey: string, original: string, shortened: string): Promise<GeminiPullVerdict> {
+/** Same holds-meaning judgment, asked of the chosen comparison model instead of Jev — purely for comparison. */
+export async function judgeRemovalCompare(
+  provider: CompareProvider,
+  apiKey: string,
+  original: string,
+  shortened: string,
+): Promise<ComparePullVerdict> {
   const from = original.trim().slice(0, MAX_LENGTH);
   const to = shortened.trim().slice(0, MAX_LENGTH);
-  const call = await askGemini<{ holds_probability: number }>(geminiApiKey, holdsPrompt(from, to), HOLDS_SCHEMA);
+  const call = await askModel(provider, apiKey, holdsPrompt(from, to), { gemini: HOLDS_GEMINI_SCHEMA, zod: HoldsSchema });
   return {
     holds: call.value.holds_probability > COLLAPSE_THRESHOLD,
     stability: call.value.holds_probability,

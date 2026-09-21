@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { runParallel, runSequential, runGeminiComparison, type RunResult, type GeminiRunResult } from "./actions";
+import { runParallel, runSequential, runCompareBatch, type RunResult, type CompareRunResult } from "./actions";
 import { TICKETS } from "@/lib/data";
 import { useApiKey } from "@/lib/api-key-context";
-import { useGeminiKey } from "@/lib/gemini-key-context";
+import { useCompareModel } from "@/lib/compare-key-context";
+import { PROVIDER_LABEL } from "@/lib/compare-model-shared";
 import CompareStrip from "@/components/CompareStrip";
 
 type RunState = { sequential: RunResult | null; parallel: RunResult | null };
@@ -87,12 +88,12 @@ const MAX_EXTRA_TICKETS = 10;
 
 export default function ParallelDemo() {
   const { apiKey } = useApiKey();
-  const { geminiKey } = useGeminiKey();
+  const { provider, compareKey } = useCompareModel();
   const [runs, setRuns] = useState<RunState>({ sequential: null, parallel: null });
-  const [geminiRun, setGeminiRun] = useState<GeminiRunResult | null>(null);
+  const [compareRun, setCompareRun] = useState<CompareRunResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const [activeRun, setActiveRun] = useState<"sequential" | "parallel" | "gemini" | null>(null);
+  const [activeRun, setActiveRun] = useState<"sequential" | "parallel" | "compare" | null>(null);
   const [customTickets, setCustomTickets] = useState<string[]>([]);
   const [newTicketText, setNewTicketText] = useState("");
 
@@ -102,13 +103,13 @@ export default function ParallelDemo() {
     setCustomTickets((prev) => [...prev, text]);
     setNewTicketText("");
     setRuns({ sequential: null, parallel: null });
-    setGeminiRun(null);
+    setCompareRun(null);
   };
 
   const removeTicket = (index: number) => {
     setCustomTickets((prev) => prev.filter((_, i) => i !== index));
     setRuns({ sequential: null, parallel: null });
-    setGeminiRun(null);
+    setCompareRun(null);
   };
 
   const trigger = (kind: "sequential" | "parallel") => {
@@ -127,14 +128,14 @@ export default function ParallelDemo() {
     });
   };
 
-  const triggerGeminiCompare = () => {
+  const triggerCompare = () => {
     setError(null);
-    setActiveRun("gemini");
+    setActiveRun("compare");
     startTransition(async () => {
       try {
-        setGeminiRun(await runGeminiComparison(geminiKey, customTickets));
+        setCompareRun(await runCompareBatch(provider, compareKey, customTickets));
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Something went wrong calling Gemini.");
+        setError(e instanceof Error ? e.message : "Something went wrong calling the comparison model.");
       }
     });
   };
@@ -144,21 +145,22 @@ export default function ParallelDemo() {
     noulById.set(r.id, r.isBillingNoul);
   }
 
-  let compareStats: { jevMs: number; geminiMs: number; geminiCostUsd: number; agreementPct: number; n: number } | null = null;
-  if (geminiRun && (runs.parallel || runs.sequential)) {
+  let compareStats: { jevMs: number; otherMs: number; otherCostUsd: number; agreementPct: number; n: number; providerLabel: string } | null = null;
+  if (compareRun && (runs.parallel || runs.sequential)) {
     const jevMs = (runs.parallel ?? runs.sequential)!.elapsedMs;
     let agree = 0;
-    for (const g of geminiRun.results) {
+    for (const g of compareRun.results) {
       const jevSaysBilling = (noulById.get(g.id) ?? 0) > 0.5;
-      const geminiSaysBilling = g.isBillingProbability > 0.5;
-      if (jevSaysBilling === geminiSaysBilling) agree++;
+      const otherSaysBilling = g.isBillingProbability > 0.5;
+      if (jevSaysBilling === otherSaysBilling) agree++;
     }
     compareStats = {
       jevMs,
-      geminiMs: geminiRun.elapsedMs,
-      geminiCostUsd: geminiRun.costUsd,
-      agreementPct: geminiRun.results.length ? agree / geminiRun.results.length : 0,
-      n: geminiRun.results.length,
+      otherMs: compareRun.elapsedMs,
+      otherCostUsd: compareRun.costUsd,
+      agreementPct: compareRun.results.length ? agree / compareRun.results.length : 0,
+      n: compareRun.results.length,
+      providerLabel: PROVIDER_LABEL[provider],
     };
   }
 
@@ -225,13 +227,13 @@ export default function ParallelDemo() {
         >
           {pending && activeRun === "parallel" ? "Running in parallel…" : "Run parallel"}
         </button>
-        {geminiKey && (runs.sequential || runs.parallel) && (
+        {compareKey && (runs.sequential || runs.parallel) && (
           <button
-            onClick={triggerGeminiCompare}
+            onClick={triggerCompare}
             disabled={pending}
             className="rounded-md border border-border-hairline px-4 py-2 text-sm font-medium text-ink-secondary hover:text-ink-primary disabled:opacity-50"
           >
-            {pending && activeRun === "gemini" ? "Comparing with Gemini…" : "Compare with Gemini"}
+            {pending && activeRun === "compare" ? `Comparing with ${PROVIDER_LABEL[provider]}…` : `Compare with ${PROVIDER_LABEL[provider]}`}
           </button>
         )}
       </div>

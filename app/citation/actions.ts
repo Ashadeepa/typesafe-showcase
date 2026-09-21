@@ -2,9 +2,10 @@
 
 import "server-only";
 import { choice, type TypeSafeClient } from "@typesafe-ai/sdk";
+import { z } from "zod";
 import { CLAIMS, SOURCES } from "@/lib/data";
 import { requireClient } from "@/lib/typesafe-client";
-import { askGemini } from "@/lib/gemini";
+import { askModel, type CompareProvider } from "@/lib/compare-model";
 
 export type Verdict = "supports" | "contradicts" | "says_nothing";
 
@@ -76,19 +77,20 @@ export async function checkCustomClaim(
   return { id: -1, claim: trimmedClaim, source: "your source", ...judged };
 }
 
-export interface GeminiClaimResult {
+export interface CompareClaimResult {
   id: number;
   verdict: Verdict;
 }
-export interface GeminiCitationResult {
-  results: GeminiClaimResult[];
+export interface CompareCitationResult {
+  results: CompareClaimResult[];
   elapsedMs: number;
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
 }
 
-const VERDICT_SCHEMA = {
+const VerdictSchema = z.object({ verdict: z.enum(["supports", "contradicts", "says_nothing"]) });
+const VERDICT_GEMINI_SCHEMA = {
   type: "object",
   properties: { verdict: { type: "string", enum: ["supports", "contradicts", "says_nothing"] } },
   required: ["verdict"],
@@ -105,12 +107,15 @@ function relationPrompt(sourceText: string, claim: string) {
   );
 }
 
-/** Same 8 claims, checked against Gemini instead of Jev — purely for a side-by-side comparison. */
-export async function runGeminiCitationCheck(geminiApiKey: string): Promise<GeminiCitationResult> {
+/** Same 8 claims, checked against the chosen comparison model instead of Jev. */
+export async function runCompareCitationCheck(provider: CompareProvider, apiKey: string): Promise<CompareCitationResult> {
   const start = performance.now();
   const calls = await Promise.all(
     CLAIMS.map((item) =>
-      askGemini<{ verdict: Verdict }>(geminiApiKey, relationPrompt(SOURCES[item.source], item.claim), VERDICT_SCHEMA),
+      askModel(provider, apiKey, relationPrompt(SOURCES[item.source], item.claim), {
+        gemini: VERDICT_GEMINI_SCHEMA,
+        zod: VerdictSchema,
+      }),
     ),
   );
   return {

@@ -2,9 +2,10 @@
 
 import "server-only";
 import { noul, type TypeSafeClient } from "@typesafe-ai/sdk";
+import { z } from "zod";
 import { TICKETS } from "@/lib/data";
 import { requireClient } from "@/lib/typesafe-client";
-import { askGemini } from "@/lib/gemini";
+import { askModel, type CompareProvider } from "@/lib/compare-model";
 
 export interface TicketResult {
   id: number;
@@ -86,19 +87,20 @@ export async function runParallel(apiKey: string, extraTicketTexts: string[] = [
   return summarize(rows, performance.now() - start);
 }
 
-export interface GeminiTicketResult {
+export interface CompareTicketResult {
   id: number;
   isBillingProbability: number;
 }
-export interface GeminiRunResult {
-  results: GeminiTicketResult[];
+export interface CompareRunResult {
+  results: CompareTicketResult[];
   elapsedMs: number;
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
 }
 
-const BILLING_SCHEMA = {
+const BillingSchema = z.object({ is_billing_probability: z.number() });
+const BILLING_GEMINI_SCHEMA = {
   type: "object",
   properties: { is_billing_probability: { type: "number" } },
   required: ["is_billing_probability"],
@@ -112,12 +114,16 @@ function billingPrompt(ticketText: string) {
   );
 }
 
-/** Same 16(+custom) tickets, run through Gemini in parallel — purely for a side-by-side comparison. */
-export async function runGeminiComparison(geminiApiKey: string, extraTicketTexts: string[] = []): Promise<GeminiRunResult> {
+/** Same 16(+custom) tickets, run through the chosen comparison model in parallel. */
+export async function runCompareBatch(
+  provider: CompareProvider,
+  apiKey: string,
+  extraTicketTexts: string[] = [],
+): Promise<CompareRunResult> {
   const tickets = buildTicketList(extraTicketTexts);
   const start = performance.now();
   const calls = await Promise.all(
-    tickets.map((t) => askGemini<{ is_billing_probability: number }>(geminiApiKey, billingPrompt(t.text), BILLING_SCHEMA)),
+    tickets.map((t) => askModel(provider, apiKey, billingPrompt(t.text), { gemini: BILLING_GEMINI_SCHEMA, zod: BillingSchema })),
   );
   return {
     results: tickets.map((t, i) => ({ id: t.id, isBillingProbability: calls[i].value.is_billing_probability })),

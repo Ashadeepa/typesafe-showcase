@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { checkCustomClaim, runCitationCheck, runGeminiCitationCheck, type ClaimResult, type GeminiCitationResult, type Verdict } from "./actions";
+import { checkCustomClaim, runCitationCheck, runCompareCitationCheck, type ClaimResult, type CompareCitationResult, type Verdict } from "./actions";
 import { SOURCES, CONFIDENCE_THRESHOLD } from "@/lib/data";
 import { useApiKey } from "@/lib/api-key-context";
-import { useGeminiKey } from "@/lib/gemini-key-context";
+import { useCompareModel } from "@/lib/compare-key-context";
+import { PROVIDER_LABEL } from "@/lib/compare-model-shared";
 import CompareStrip from "@/components/CompareStrip";
 
 const VERDICT_META: Record<Verdict, { label: string; icon: string; color: string }> = {
@@ -97,13 +98,13 @@ function TryYourOwn() {
 
 export default function CitationDemo() {
   const { apiKey } = useApiKey();
-  const { geminiKey } = useGeminiKey();
+  const { provider, compareKey } = useCompareModel();
   const [results, setResults] = useState<ClaimResult[] | null>(null);
   const [jevMs, setJevMs] = useState<number | null>(null);
-  const [geminiResult, setGeminiResult] = useState<GeminiCitationResult | null>(null);
+  const [compareResult, setCompareResult] = useState<CompareCitationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const [geminiPending, startGeminiTransition] = useTransition();
+  const [comparePending, startCompareTransition] = useTransition();
 
   const run = () => {
     setError(null);
@@ -119,13 +120,13 @@ export default function CitationDemo() {
     });
   };
 
-  const runGeminiCompare = () => {
+  const runCompare = () => {
     setError(null);
-    startGeminiTransition(async () => {
+    startCompareTransition(async () => {
       try {
-        setGeminiResult(await runGeminiCitationCheck(geminiKey));
+        setCompareResult(await runCompareCitationCheck(provider, compareKey));
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Something went wrong calling Gemini.");
+        setError(e instanceof Error ? e.message : "Something went wrong calling the comparison model.");
       }
     });
   };
@@ -134,19 +135,20 @@ export default function CitationDemo() {
     (r) => r.verdict !== "supports" || r.confidence < CONFIDENCE_THRESHOLD,
   );
 
-  let compareStats: { jevMs: number; geminiMs: number; geminiCostUsd: number; agreementPct: number; n: number } | null = null;
-  if (results && jevMs !== null && geminiResult) {
+  let compareStats: { jevMs: number; otherMs: number; otherCostUsd: number; agreementPct: number; n: number; providerLabel: string } | null = null;
+  if (results && jevMs !== null && compareResult) {
     const verdictById = new Map(results.map((r) => [r.id, r.verdict]));
     let agree = 0;
-    for (const g of geminiResult.results) {
+    for (const g of compareResult.results) {
       if (verdictById.get(g.id) === g.verdict) agree++;
     }
     compareStats = {
       jevMs,
-      geminiMs: geminiResult.elapsedMs,
-      geminiCostUsd: geminiResult.costUsd,
-      agreementPct: geminiResult.results.length ? agree / geminiResult.results.length : 0,
-      n: geminiResult.results.length,
+      otherMs: compareResult.elapsedMs,
+      otherCostUsd: compareResult.costUsd,
+      agreementPct: compareResult.results.length ? agree / compareResult.results.length : 0,
+      n: compareResult.results.length,
+      providerLabel: PROVIDER_LABEL[provider],
     };
   }
 
@@ -175,13 +177,13 @@ export default function CitationDemo() {
         >
           {pending ? "Checking claims…" : "Run citation check"}
         </button>
-        {geminiKey && results && (
+        {compareKey && results && (
           <button
-            onClick={runGeminiCompare}
-            disabled={geminiPending}
+            onClick={runCompare}
+            disabled={comparePending}
             className="self-start rounded-md border border-border-hairline px-4 py-2 text-sm font-medium text-ink-secondary hover:text-ink-primary disabled:opacity-50"
           >
-            {geminiPending ? "Comparing with Gemini…" : "Compare with Gemini"}
+            {comparePending ? `Comparing with ${PROVIDER_LABEL[provider]}…` : `Compare with ${PROVIDER_LABEL[provider]}`}
           </button>
         )}
       </div>

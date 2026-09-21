@@ -2,9 +2,10 @@
 
 import "server-only";
 import { score, type TypeSafeClient } from "@typesafe-ai/sdk";
+import { z } from "zod";
 import { NOTES } from "@/lib/data";
 import { requireClient } from "@/lib/typesafe-client";
-import { askGemini } from "@/lib/gemini";
+import { askModel, type CompareProvider } from "@/lib/compare-model";
 
 const QUESTION_ID = "escalation";
 
@@ -74,19 +75,20 @@ export async function runToneCheckCustom(
   return judgeOne(client, { id: -1, text: trimmedText, context: trimmedContext });
 }
 
-export interface GeminiNoteResult {
+export interface CompareNoteResult {
   id: number;
   score: number;
 }
-export interface GeminiToneResult {
-  results: GeminiNoteResult[];
+export interface CompareToneResult {
+  results: CompareNoteResult[];
   elapsedMs: number;
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
 }
 
-const SCORE_SCHEMA = {
+const ScoreSchema = z.object({ score: z.number() });
+const SCORE_GEMINI_SCHEMA = {
   type: "object",
   properties: { score: { type: "number" } },
   required: ["score"],
@@ -103,11 +105,13 @@ function escalationPrompt(message: string, whereSaid: string) {
   );
 }
 
-/** Same 10 notes, scored by Gemini instead of Jev — purely for a side-by-side comparison. */
-export async function runGeminiToneCheck(geminiApiKey: string): Promise<GeminiToneResult> {
+/** Same 10 notes, scored by the chosen comparison model instead of Jev. */
+export async function runCompareToneCheck(provider: CompareProvider, apiKey: string): Promise<CompareToneResult> {
   const start = performance.now();
   const calls = await Promise.all(
-    NOTES.map((n) => askGemini<{ score: number }>(geminiApiKey, escalationPrompt(n.text, n.context), SCORE_SCHEMA)),
+    NOTES.map((n) =>
+      askModel(provider, apiKey, escalationPrompt(n.text, n.context), { gemini: SCORE_GEMINI_SCHEMA, zod: ScoreSchema }),
+    ),
   );
   return {
     results: NOTES.map((n, i) => ({ id: n.id, score: calls[i].value.score })),

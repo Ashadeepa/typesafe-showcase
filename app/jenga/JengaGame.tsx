@@ -1,19 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { judgeRemoval, judgeRemovalGemini } from "./actions";
+import { judgeRemoval, judgeRemovalCompare } from "./actions";
 import { SENTENCES, COLLAPSE_THRESHOLD, type JengaSentence } from "@/lib/jenga-data";
 import { useApiKey } from "@/lib/api-key-context";
-import { useGeminiKey } from "@/lib/gemini-key-context";
+import { useCompareModel } from "@/lib/compare-key-context";
+import { PROVIDER_LABEL } from "@/lib/compare-model-shared";
 import CompareStrip from "@/components/CompareStrip";
 
 interface CompareEntry {
   jevMs: number;
   jevStability: number;
-  geminiMs?: number;
-  geminiStability?: number;
-  geminiCostUsd?: number;
-  geminiError?: string;
+  otherMs?: number;
+  otherStability?: number;
+  otherCostUsd?: number;
+  otherError?: string;
 }
 
 type Phase = "setup" | "playing" | "judging" | "collapsed";
@@ -44,7 +45,7 @@ function stability(value: number): { text: string; color: string } {
 
 export default function JengaGame() {
   const { apiKey } = useApiKey();
-  const { geminiKey } = useGeminiKey();
+  const { provider, compareKey } = useCompareModel();
   const [phase, setPhase] = useState<Phase>("setup");
   const [original, setOriginal] = useState("");
   const [words, setWords] = useState<string[]>([]);
@@ -96,16 +97,16 @@ export default function JengaGame() {
       const jevMs = performance.now() - jevStart;
 
       // Fire-and-forget: purely informational, never blocks the actual pull or its outcome.
-      if (geminiKey) {
-        judgeRemovalGemini(geminiKey, original, candidate)
-          .then((g) =>
+      if (compareKey) {
+        judgeRemovalCompare(provider, compareKey, original, candidate)
+          .then((other) =>
             setCompareLog((l) =>
-              [...l, { jevMs, jevStability: verdict.stability, geminiMs: g.latencyMs, geminiStability: g.stability, geminiCostUsd: g.costUsd }].slice(-20),
+              [...l, { jevMs, jevStability: verdict.stability, otherMs: other.latencyMs, otherStability: other.stability, otherCostUsd: other.costUsd }].slice(-20),
             ),
           )
           .catch((e) =>
             setCompareLog((l) =>
-              [...l, { jevMs, jevStability: verdict.stability, geminiError: e instanceof Error ? e.message : "Gemini call failed." }].slice(-20),
+              [...l, { jevMs, jevStability: verdict.stability, otherError: e instanceof Error ? e.message : "Comparison call failed." }].slice(-20),
             ),
           );
       }
@@ -128,19 +129,20 @@ export default function JengaGame() {
     }
   }
 
-  let compareStats: { jevMs: number; geminiMs: number; geminiCostUsd: number; agreementPct: number; n: number } | null = null;
-  const settledCompares = compareLog.filter((c) => c.geminiMs !== undefined);
+  let compareStats: { jevMs: number; otherMs: number; otherCostUsd: number; agreementPct: number; n: number; providerLabel: string } | null = null;
+  const settledCompares = compareLog.filter((c) => c.otherMs !== undefined);
   if (settledCompares.length > 0) {
     let agree = 0;
     for (const c of settledCompares) {
-      if ((c.jevStability > COLLAPSE_THRESHOLD) === ((c.geminiStability as number) > COLLAPSE_THRESHOLD)) agree++;
+      if ((c.jevStability > COLLAPSE_THRESHOLD) === ((c.otherStability as number) > COLLAPSE_THRESHOLD)) agree++;
     }
     compareStats = {
       jevMs: settledCompares.reduce((s, c) => s + c.jevMs, 0) / settledCompares.length,
-      geminiMs: settledCompares.reduce((s, c) => s + (c.geminiMs as number), 0) / settledCompares.length,
-      geminiCostUsd: settledCompares.reduce((s, c) => s + (c.geminiCostUsd ?? 0), 0),
+      otherMs: settledCompares.reduce((s, c) => s + (c.otherMs as number), 0) / settledCompares.length,
+      otherCostUsd: settledCompares.reduce((s, c) => s + (c.otherCostUsd ?? 0), 0),
       agreementPct: agree / settledCompares.length,
       n: settledCompares.length,
+      providerLabel: PROVIDER_LABEL[provider],
     };
   }
 
