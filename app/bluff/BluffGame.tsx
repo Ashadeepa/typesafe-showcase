@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { chooseAiPlay, judgeBluff } from "./actions";
+import { judgeBluffGemini } from "./gemini-actions";
 import { useApiKey } from "@/lib/api-key-context";
+import { useGeminiKey } from "@/lib/gemini-key-context";
 import styles from "./bluff.module.css";
 
 type Suit = "spade" | "heart" | "diamond" | "club";
@@ -35,6 +37,16 @@ interface EngineCallbacks {
   setStatus: (id: number, text: string) => void;
   askYesNo: (body: string) => Promise<boolean>;
   onError: (msg: string) => void;
+  geminiApiKey: string;
+  onCompare: (entry: CompareEntry) => void;
+}
+interface CompareEntry {
+  jevMs: number;
+  jevProbability: number;
+  geminiMs?: number;
+  geminiProbability?: number;
+  geminiCostUsd?: number;
+  geminiError?: string;
 }
 
 const SUITS: Suit[] = ["spade", "heart", "diamond", "club"];
@@ -122,20 +134,49 @@ async function aiChooseCards(
   return toPlay;
 }
 
-async function decideAiCall(apiKey: string, observer: PlayerState, play: Play, onError: (msg: string) => void): Promise<boolean> {
+async function decideAiCall(
+  apiKey: string,
+  observer: PlayerState,
+  play: Play,
+  onError: (msg: string) => void,
+  geminiApiKey: string,
+  onCompare: (entry: CompareEntry) => void,
+): Promise<boolean> {
   const ownCount = observer.hand.filter((c) => c.rank === play.claimedRank).length;
   // A standard deck holds exactly 4 of any rank — if the observer's own hand plus this play
   // already exceeds that, the claim cannot possibly be true. No need to ask Jev.
   if (ownCount + play.cards.length > 4) return true;
 
+  const jevStart = performance.now();
+  let bluffProbability: number;
   try {
-    const { bluffProbability } = await judgeBluff(apiKey, play.claimedRank, play.cards.length, ownCount);
-    return Math.random() < bluffProbability;
+    const r = await judgeBluff(apiKey, play.claimedRank, play.cards.length, ownCount);
+    bluffProbability = r.bluffProbability;
   } catch (e) {
     onError(e instanceof Error ? e.message : "The call to TypeSafe failed.");
-    const fallback = Math.min(0.85, 0.1 + (play.cards.length - 1) * 0.08 + ownCount * 0.15);
-    return Math.random() < fallback;
+    bluffProbability = Math.min(0.85, 0.1 + (play.cards.length - 1) * 0.08 + ownCount * 0.15);
   }
+  const jevMs = performance.now() - jevStart;
+
+  // Fire-and-forget: the comparison is purely informational and must never slow the AI down or
+  // affect the outcome — Gemini's answer is reported side by side, not consulted for the call.
+  if (geminiApiKey) {
+    judgeBluffGemini(geminiApiKey, play.claimedRank, play.cards.length, ownCount)
+      .then((g) =>
+        onCompare({
+          jevMs,
+          jevProbability: bluffProbability,
+          geminiMs: g.latencyMs,
+          geminiProbability: g.bluffProbability,
+          geminiCostUsd: g.costUsd,
+        }),
+      )
+      .catch((e) =>
+        onCompare({ jevMs, jevProbability: bluffProbability, geminiError: e instanceof Error ? e.message : "Gemini call failed." }),
+      );
+  }
+
+  return Math.random() < bluffProbability;
 }
 
 async function offerBluffCall(players: PlayerState[], actor: PlayerState, play: Play, apiKey: string, cb: EngineCallbacks): Promise<PlayerState | null> {
@@ -151,7 +192,7 @@ async function offerBluffCall(players: PlayerState[], actor: PlayerState, play: 
     } else {
       cb.setStatus(p.id, "weighing the claim…");
       await sleep(300 + Math.random() * 300);
-      willCall = await decideAiCall(apiKey, p, play, cb.onError);
+      willCall = await decideAiCall(apiKey, p, play, cb.onError, cb.geminiApiKey, cb.onCompare);
       cb.setStatus(p.id, "");
       if (willCall) cb.appendLog(`${p.name} eyes the pile with suspicion…`);
     }
@@ -227,10 +268,54 @@ async function runLoop(
   }
 }
 
-// ---- React component ----
+// ---- React components ----
+
+function average(arr: number[]) {
+  return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+}
+
+function ComparePanel({ entries }: { entries: CompareEntry[] }) {
+  const jevTimes = entries.map((e) => e.jevMs);
+  const geminiEntries = entries.filter((e) => e.geminiMs !== undefined);
+  const geminiTimes = geminiEntries.map((e) => e.geminiMs as number);
+  const totalCost = geminiEntries.reduce((sum, e) => sum + (e.geminiCostUsd ?? 0), 0);
+  const last = entries[entries.length - 1];
+
+  return (
+    <div className={styles.comparePanel}>
+      <div className={styles.compareHeader}>
+        <span>Jev vs Gemini 3.5 Flash-Lite</span>
+        <span className={styles.compareCount}>{entries.length} compared</span>
+      </div>
+      <div className={styles.compareSummary}>
+        <div className={styles.compareRow}>
+          <span className={styles.compareModelName}>Jev</span>
+          <span className={styles.compareStat}>{average(jevTimes).toFixed(0)}ms avg</span>
+        </div>
+        <div className={styles.compareRow}>
+          <span className={styles.compareModelName}>Gemini</span>
+          <span className={styles.compareStat}>
+            {geminiTimes.length ? `${average(geminiTimes).toFixed(0)}ms avg` : "pending…"} · ${totalCost.toFixed(5)} total
+          </span>
+        </div>
+      </div>
+      {last && (
+        <p className={styles.compareLast}>
+          Last claim: Jev {last.jevProbability.toFixed(2)} ({last.jevMs.toFixed(0)}ms)
+          {last.geminiProbability !== undefined
+            ? ` vs Gemini ${last.geminiProbability.toFixed(2)} (${(last.geminiMs as number).toFixed(0)}ms)`
+            : last.geminiError
+              ? ` — Gemini error: ${last.geminiError}`
+              : " — Gemini pending…"}
+        </p>
+      )}
+    </div>
+  );
+}
 
 export default function BluffGame() {
   const { apiKey } = useApiKey();
+  const { geminiKey } = useGeminiKey();
   const gameRef = useRef<GameState | null>(null);
   const runIdRef = useRef(0);
   const humanResolveRef = useRef<((cards: Card[]) => void) | null>(null);
@@ -250,6 +335,7 @@ export default function BluffGame() {
   const [prompt, setPrompt] = useState<{ body: string } | null>(null);
   const [statusById, setStatusById] = useState<Record<number, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const [compareLog, setCompareLog] = useState<CompareEntry[]>([]);
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ block: "nearest" });
@@ -298,6 +384,7 @@ export default function BluffGame() {
     setWinner(null);
     setError(null);
     setStatusById({});
+    setCompareLog([]);
     setPhase("running");
     snapshot();
 
@@ -306,6 +393,8 @@ export default function BluffGame() {
       setStatus: (id, text) => setStatusById((s) => ({ ...s, [id]: text })),
       askYesNo,
       onError: (msg) => setError(msg),
+      geminiApiKey: geminiKey,
+      onCompare: (entry) => setCompareLog((l) => [...l, entry].slice(-50)),
     };
     runLoop(
       g,
@@ -349,6 +438,12 @@ export default function BluffGame() {
           Deal cards
         </button>
         {!apiKey && <p className={styles.keyHint}>Enter your TypeSafe API key above to play.</p>}
+        {apiKey && !geminiKey && (
+          <p className={styles.compareHint}>
+            Add a Gemini key in the bar above to compare every bluff-call judgment against Gemini
+            3.5 Flash-Lite side by side — it never affects gameplay.
+          </p>
+        )}
       </div>
     );
   }
@@ -378,6 +473,10 @@ export default function BluffGame() {
             <span className={styles.claimValue}>{phase === "over" ? "—" : PLURAL[claimedRank]}</span>
           </div>
         </div>
+
+        {geminiKey && compareLog.length > 0 && (
+          <ComparePanel entries={compareLog} />
+        )}
 
         {prompt && (
           <div className={styles.prompt}>

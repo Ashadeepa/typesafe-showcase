@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { runParallel, runSequential, type RunResult } from "./actions";
+import { runParallel, runSequential, runGeminiComparison, type RunResult, type GeminiRunResult } from "./actions";
 import { TICKETS } from "@/lib/data";
 import { useApiKey } from "@/lib/api-key-context";
+import { useGeminiKey } from "@/lib/gemini-key-context";
+import CompareStrip from "@/components/CompareStrip";
 
 type RunState = { sequential: RunResult | null; parallel: RunResult | null };
 
@@ -85,10 +87,12 @@ const MAX_EXTRA_TICKETS = 10;
 
 export default function ParallelDemo() {
   const { apiKey } = useApiKey();
+  const { geminiKey } = useGeminiKey();
   const [runs, setRuns] = useState<RunState>({ sequential: null, parallel: null });
+  const [geminiRun, setGeminiRun] = useState<GeminiRunResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const [activeRun, setActiveRun] = useState<"sequential" | "parallel" | null>(null);
+  const [activeRun, setActiveRun] = useState<"sequential" | "parallel" | "gemini" | null>(null);
   const [customTickets, setCustomTickets] = useState<string[]>([]);
   const [newTicketText, setNewTicketText] = useState("");
 
@@ -98,11 +102,13 @@ export default function ParallelDemo() {
     setCustomTickets((prev) => [...prev, text]);
     setNewTicketText("");
     setRuns({ sequential: null, parallel: null });
+    setGeminiRun(null);
   };
 
   const removeTicket = (index: number) => {
     setCustomTickets((prev) => prev.filter((_, i) => i !== index));
     setRuns({ sequential: null, parallel: null });
+    setGeminiRun(null);
   };
 
   const trigger = (kind: "sequential" | "parallel") => {
@@ -121,9 +127,39 @@ export default function ParallelDemo() {
     });
   };
 
+  const triggerGeminiCompare = () => {
+    setError(null);
+    setActiveRun("gemini");
+    startTransition(async () => {
+      try {
+        setGeminiRun(await runGeminiComparison(geminiKey, customTickets));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Something went wrong calling Gemini.");
+      }
+    });
+  };
+
   const noulById = new Map<number, number>();
   for (const r of runs.parallel?.results ?? runs.sequential?.results ?? []) {
     noulById.set(r.id, r.isBillingNoul);
+  }
+
+  let compareStats: { jevMs: number; geminiMs: number; geminiCostUsd: number; agreementPct: number; n: number } | null = null;
+  if (geminiRun && (runs.parallel || runs.sequential)) {
+    const jevMs = (runs.parallel ?? runs.sequential)!.elapsedMs;
+    let agree = 0;
+    for (const g of geminiRun.results) {
+      const jevSaysBilling = (noulById.get(g.id) ?? 0) > 0.5;
+      const geminiSaysBilling = g.isBillingProbability > 0.5;
+      if (jevSaysBilling === geminiSaysBilling) agree++;
+    }
+    compareStats = {
+      jevMs,
+      geminiMs: geminiRun.elapsedMs,
+      geminiCostUsd: geminiRun.costUsd,
+      agreementPct: geminiRun.results.length ? agree / geminiRun.results.length : 0,
+      n: geminiRun.results.length,
+    };
   }
 
   const allTickets = [
@@ -189,6 +225,15 @@ export default function ParallelDemo() {
         >
           {pending && activeRun === "parallel" ? "Running in parallel…" : "Run parallel"}
         </button>
+        {geminiKey && (runs.sequential || runs.parallel) && (
+          <button
+            onClick={triggerGeminiCompare}
+            disabled={pending}
+            className="rounded-md border border-border-hairline px-4 py-2 text-sm font-medium text-ink-secondary hover:text-ink-primary disabled:opacity-50"
+          >
+            {pending && activeRun === "gemini" ? "Comparing with Gemini…" : "Compare with Gemini"}
+          </button>
+        )}
       </div>
 
       {error && (
@@ -198,6 +243,7 @@ export default function ParallelDemo() {
       )}
 
       {runs.sequential && runs.parallel && <TimingChart sequential={runs.sequential} parallel={runs.parallel} />}
+      {compareStats && <CompareStrip {...compareStats} />}
 
       <div className="rounded-lg border border-border-hairline bg-chart-surface p-5">
         <h2 className="mb-2 text-sm font-semibold text-ink-primary">

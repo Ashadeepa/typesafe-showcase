@@ -4,6 +4,7 @@ import "server-only";
 import { noul, type TypeSafeClient } from "@typesafe-ai/sdk";
 import { TICKETS } from "@/lib/data";
 import { requireClient } from "@/lib/typesafe-client";
+import { askGemini } from "@/lib/gemini";
 
 export interface TicketResult {
   id: number;
@@ -83,4 +84,46 @@ export async function runParallel(apiKey: string, extraTicketTexts: string[] = [
   const start = performance.now();
   const rows = await Promise.all(tickets.map((ticket) => judgeOne(client, ticket)));
   return summarize(rows, performance.now() - start);
+}
+
+export interface GeminiTicketResult {
+  id: number;
+  isBillingProbability: number;
+}
+export interface GeminiRunResult {
+  results: GeminiTicketResult[];
+  elapsedMs: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+}
+
+const BILLING_SCHEMA = {
+  type: "object",
+  properties: { is_billing_probability: { type: "number" } },
+  required: ["is_billing_probability"],
+};
+
+function billingPrompt(ticketText: string) {
+  return (
+    "Is this support ticket about billing, charges, invoices, or refunds? " +
+    `Ticket: "${ticketText}". ` +
+    'Respond with only a JSON object: {"is_billing_probability": <number between 0 and 1>}.'
+  );
+}
+
+/** Same 16(+custom) tickets, run through Gemini in parallel — purely for a side-by-side comparison. */
+export async function runGeminiComparison(geminiApiKey: string, extraTicketTexts: string[] = []): Promise<GeminiRunResult> {
+  const tickets = buildTicketList(extraTicketTexts);
+  const start = performance.now();
+  const calls = await Promise.all(
+    tickets.map((t) => askGemini<{ is_billing_probability: number }>(geminiApiKey, billingPrompt(t.text), BILLING_SCHEMA)),
+  );
+  return {
+    results: tickets.map((t, i) => ({ id: t.id, isBillingProbability: calls[i].value.is_billing_probability })),
+    elapsedMs: performance.now() - start,
+    inputTokens: calls.reduce((s, c) => s + c.inputTokens, 0),
+    outputTokens: calls.reduce((s, c) => s + c.outputTokens, 0),
+    costUsd: calls.reduce((s, c) => s + c.costUsd, 0),
+  };
 }

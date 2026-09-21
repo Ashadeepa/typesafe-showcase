@@ -1,9 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { judgeRemoval } from "./actions";
+import { judgeRemoval, judgeRemovalGemini } from "./actions";
 import { SENTENCES, COLLAPSE_THRESHOLD, type JengaSentence } from "@/lib/jenga-data";
 import { useApiKey } from "@/lib/api-key-context";
+import { useGeminiKey } from "@/lib/gemini-key-context";
+import CompareStrip from "@/components/CompareStrip";
+
+interface CompareEntry {
+  jevMs: number;
+  jevStability: number;
+  geminiMs?: number;
+  geminiStability?: number;
+  geminiCostUsd?: number;
+  geminiError?: string;
+}
 
 type Phase = "setup" | "playing" | "judging" | "collapsed";
 
@@ -33,6 +44,7 @@ function stability(value: number): { text: string; color: string } {
 
 export default function JengaGame() {
   const { apiKey } = useApiKey();
+  const { geminiKey } = useGeminiKey();
   const [phase, setPhase] = useState<Phase>("setup");
   const [original, setOriginal] = useState("");
   const [words, setWords] = useState<string[]>([]);
@@ -43,6 +55,7 @@ export default function JengaGame() {
   const [collapse, setCollapse] = useState<CollapseInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [customText, setCustomText] = useState("");
+  const [compareLog, setCompareLog] = useState<CompareEntry[]>([]);
 
   function startGame(text: string) {
     const cleaned = text.trim().replace(/[.!?]+$/, "");
@@ -59,6 +72,7 @@ export default function JengaGame() {
     setLastPull(null);
     setCollapse(null);
     setError(null);
+    setCompareLog([]);
     setPhase("playing");
   }
 
@@ -76,8 +90,26 @@ export default function JengaGame() {
     setError(null);
     setPhase("judging");
 
+    const jevStart = performance.now();
     try {
       const verdict = await judgeRemoval(apiKey, original, candidate);
+      const jevMs = performance.now() - jevStart;
+
+      // Fire-and-forget: purely informational, never blocks the actual pull or its outcome.
+      if (geminiKey) {
+        judgeRemovalGemini(geminiKey, original, candidate)
+          .then((g) =>
+            setCompareLog((l) =>
+              [...l, { jevMs, jevStability: verdict.stability, geminiMs: g.latencyMs, geminiStability: g.stability, geminiCostUsd: g.costUsd }].slice(-20),
+            ),
+          )
+          .catch((e) =>
+            setCompareLog((l) =>
+              [...l, { jevMs, jevStability: verdict.stability, geminiError: e instanceof Error ? e.message : "Gemini call failed." }].slice(-20),
+            ),
+          );
+      }
+
       if (verdict.holds) {
         setWords(remaining);
         setPulled((p) => [...p, word]);
@@ -94,6 +126,22 @@ export default function JengaGame() {
       setError(e instanceof Error ? e.message : "Something went wrong calling TypeSafe.");
       setPhase("playing");
     }
+  }
+
+  let compareStats: { jevMs: number; geminiMs: number; geminiCostUsd: number; agreementPct: number; n: number } | null = null;
+  const settledCompares = compareLog.filter((c) => c.geminiMs !== undefined);
+  if (settledCompares.length > 0) {
+    let agree = 0;
+    for (const c of settledCompares) {
+      if ((c.jevStability > COLLAPSE_THRESHOLD) === ((c.geminiStability as number) > COLLAPSE_THRESHOLD)) agree++;
+    }
+    compareStats = {
+      jevMs: settledCompares.reduce((s, c) => s + c.jevMs, 0) / settledCompares.length,
+      geminiMs: settledCompares.reduce((s, c) => s + (c.geminiMs as number), 0) / settledCompares.length,
+      geminiCostUsd: settledCompares.reduce((s, c) => s + (c.geminiCostUsd ?? 0), 0),
+      agreementPct: agree / settledCompares.length,
+      n: settledCompares.length,
+    };
   }
 
   const meter = stability(integrity);
@@ -275,6 +323,8 @@ export default function JengaGame() {
               </>
             )}
           </div>
+
+          {compareStats && <CompareStrip {...compareStats} />}
 
           {collapsed && collapse && (
             <div

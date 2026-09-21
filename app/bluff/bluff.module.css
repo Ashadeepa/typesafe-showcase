@@ -107,6 +107,68 @@
   color: var(--parchment-dim);
 }
 
+.compareHint {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--seam);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--parchment-dim);
+  max-width: 46ch;
+}
+
+/* ---- Jev vs Gemini comparison panel ---- */
+
+.comparePanel {
+  border-radius: 10px;
+  border: 1px solid var(--seam);
+  background: var(--ink-2);
+  padding: 0.85rem 1rem;
+}
+.compareHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--font-display), serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  color: var(--gold-bright);
+}
+.compareCount {
+  font-family: var(--font-numeric), monospace;
+  font-size: 0.68rem;
+  color: var(--parchment-dim);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.compareSummary {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+}
+.compareRow {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+.compareModelName {
+  font-family: var(--font-display), serif;
+  font-size: 0.72rem;
+  color: var(--parchment);
+}
+.compareStat {
+  font-family: var(--font-numeric), monospace;
+  font-size: 0.72rem;
+  color: var(--parchment-dim);
+}
+.compareLast {
+  margin: 0.6rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--parchment-dim);
+}
+
 /* ---- layout: main column + right-hand log ---- */
 
 .grid {

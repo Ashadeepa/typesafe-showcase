@@ -4,6 +4,7 @@ import "server-only";
 import { score, type TypeSafeClient } from "@typesafe-ai/sdk";
 import { NOTES } from "@/lib/data";
 import { requireClient } from "@/lib/typesafe-client";
+import { askGemini } from "@/lib/gemini";
 
 const QUESTION_ID = "escalation";
 
@@ -71,4 +72,48 @@ export async function runToneCheckCustom(
   const trimmedContext = context.trim().slice(0, MAX_INPUT_LENGTH) || "Custom input";
 
   return judgeOne(client, { id: -1, text: trimmedText, context: trimmedContext });
+}
+
+export interface GeminiNoteResult {
+  id: number;
+  score: number;
+}
+export interface GeminiToneResult {
+  results: GeminiNoteResult[];
+  elapsedMs: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+}
+
+const SCORE_SCHEMA = {
+  type: "object",
+  properties: { score: { type: "number" } },
+  required: ["score"],
+};
+
+function escalationPrompt(message: string, whereSaid: string) {
+  return (
+    "How passive-aggressive is this message, on a scale from 0 to 3, where 0 is warm and direct " +
+    "with no subtext, 1 is mostly polite but a word choice or clipped tone hints something's off, " +
+    "2 is a clear passive-aggressive tell (e.g. a pointed 'per my last email' or a lonely " +
+    "exclamation point), and 3 is full passive-aggressive weaponry (ALL CAPS, sarcasm, a " +
+    `backhanded compliment)? Message: "${message}" (said in: ${whereSaid}) ` +
+    'Respond with only a JSON object: {"score": <number between 0 and 3>}.'
+  );
+}
+
+/** Same 10 notes, scored by Gemini instead of Jev — purely for a side-by-side comparison. */
+export async function runGeminiToneCheck(geminiApiKey: string): Promise<GeminiToneResult> {
+  const start = performance.now();
+  const calls = await Promise.all(
+    NOTES.map((n) => askGemini<{ score: number }>(geminiApiKey, escalationPrompt(n.text, n.context), SCORE_SCHEMA)),
+  );
+  return {
+    results: NOTES.map((n, i) => ({ id: n.id, score: calls[i].value.score })),
+    elapsedMs: performance.now() - start,
+    inputTokens: calls.reduce((s, c) => s + c.inputTokens, 0),
+    outputTokens: calls.reduce((s, c) => s + c.outputTokens, 0),
+    costUsd: calls.reduce((s, c) => s + c.costUsd, 0),
+  };
 }

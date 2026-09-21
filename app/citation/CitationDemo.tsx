@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { checkCustomClaim, runCitationCheck, type ClaimResult, type Verdict } from "./actions";
+import { checkCustomClaim, runCitationCheck, runGeminiCitationCheck, type ClaimResult, type GeminiCitationResult, type Verdict } from "./actions";
 import { SOURCES, CONFIDENCE_THRESHOLD } from "@/lib/data";
 import { useApiKey } from "@/lib/api-key-context";
+import { useGeminiKey } from "@/lib/gemini-key-context";
+import CompareStrip from "@/components/CompareStrip";
 
 const VERDICT_META: Record<Verdict, { label: string; icon: string; color: string }> = {
   supports: { label: "Supports", icon: "✓", color: "var(--status-good)" },
@@ -95,17 +97,35 @@ function TryYourOwn() {
 
 export default function CitationDemo() {
   const { apiKey } = useApiKey();
+  const { geminiKey } = useGeminiKey();
   const [results, setResults] = useState<ClaimResult[] | null>(null);
+  const [jevMs, setJevMs] = useState<number | null>(null);
+  const [geminiResult, setGeminiResult] = useState<GeminiCitationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [geminiPending, startGeminiTransition] = useTransition();
 
   const run = () => {
     setError(null);
     startTransition(async () => {
       try {
-        setResults(await runCitationCheck(apiKey));
+        const start = performance.now();
+        const r = await runCitationCheck(apiKey);
+        setJevMs(performance.now() - start);
+        setResults(r);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Something went wrong calling TypeSafe.");
+      }
+    });
+  };
+
+  const runGeminiCompare = () => {
+    setError(null);
+    startGeminiTransition(async () => {
+      try {
+        setGeminiResult(await runGeminiCitationCheck(geminiKey));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Something went wrong calling Gemini.");
       }
     });
   };
@@ -113,6 +133,22 @@ export default function CitationDemo() {
   const needsReview = (results ?? []).filter(
     (r) => r.verdict !== "supports" || r.confidence < CONFIDENCE_THRESHOLD,
   );
+
+  let compareStats: { jevMs: number; geminiMs: number; geminiCostUsd: number; agreementPct: number; n: number } | null = null;
+  if (results && jevMs !== null && geminiResult) {
+    const verdictById = new Map(results.map((r) => [r.id, r.verdict]));
+    let agree = 0;
+    for (const g of geminiResult.results) {
+      if (verdictById.get(g.id) === g.verdict) agree++;
+    }
+    compareStats = {
+      jevMs,
+      geminiMs: geminiResult.elapsedMs,
+      geminiCostUsd: geminiResult.costUsd,
+      agreementPct: geminiResult.results.length ? agree / geminiResult.results.length : 0,
+      n: geminiResult.results.length,
+    };
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -130,14 +166,27 @@ export default function CitationDemo() {
 
       <TryYourOwn />
 
-      <button
-        onClick={run}
-        disabled={pending || !apiKey}
-        className="self-start rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        style={{ backgroundColor: "var(--series-1)" }}
-      >
-        {pending ? "Checking claims…" : "Run citation check"}
-      </button>
+      <div className="flex flex-wrap gap-3">
+        <button
+          onClick={run}
+          disabled={pending || !apiKey}
+          className="self-start rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          style={{ backgroundColor: "var(--series-1)" }}
+        >
+          {pending ? "Checking claims…" : "Run citation check"}
+        </button>
+        {geminiKey && results && (
+          <button
+            onClick={runGeminiCompare}
+            disabled={geminiPending}
+            className="self-start rounded-md border border-border-hairline px-4 py-2 text-sm font-medium text-ink-secondary hover:text-ink-primary disabled:opacity-50"
+          >
+            {geminiPending ? "Comparing with Gemini…" : "Compare with Gemini"}
+          </button>
+        )}
+      </div>
+
+      {compareStats && <CompareStrip {...compareStats} />}
 
       {error && (
         <p className="rounded-md border px-3 py-2 text-sm" style={{ borderColor: "var(--status-critical)", color: "var(--status-critical)" }}>

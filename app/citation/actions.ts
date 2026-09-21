@@ -4,6 +4,7 @@ import "server-only";
 import { choice, type TypeSafeClient } from "@typesafe-ai/sdk";
 import { CLAIMS, SOURCES } from "@/lib/data";
 import { requireClient } from "@/lib/typesafe-client";
+import { askGemini } from "@/lib/gemini";
 
 export type Verdict = "supports" | "contradicts" | "says_nothing";
 
@@ -73,4 +74,50 @@ export async function checkCustomClaim(
 
   const judged = await checkAgainstSource(client, trimmedClaim, trimmedSource);
   return { id: -1, claim: trimmedClaim, source: "your source", ...judged };
+}
+
+export interface GeminiClaimResult {
+  id: number;
+  verdict: Verdict;
+}
+export interface GeminiCitationResult {
+  results: GeminiClaimResult[];
+  elapsedMs: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+}
+
+const VERDICT_SCHEMA = {
+  type: "object",
+  properties: { verdict: { type: "string", enum: ["supports", "contradicts", "says_nothing"] } },
+  required: ["verdict"],
+};
+
+function relationPrompt(sourceText: string, claim: string) {
+  return (
+    "How does the source relate to the claim? Judge only against what the source actually says, " +
+    `not general knowledge. Source: "${sourceText}" Claim: "${claim}" ` +
+    'Respond with only a JSON object: {"verdict": "supports" | "contradicts" | "says_nothing"}. ' +
+    '"supports" means the source states the claim or directly implies it is true. "contradicts" ' +
+    "means the source states the opposite, or a detail that makes the claim false. " +
+    '"says_nothing" means the source never addresses what the claim asserts, either way.'
+  );
+}
+
+/** Same 8 claims, checked against Gemini instead of Jev — purely for a side-by-side comparison. */
+export async function runGeminiCitationCheck(geminiApiKey: string): Promise<GeminiCitationResult> {
+  const start = performance.now();
+  const calls = await Promise.all(
+    CLAIMS.map((item) =>
+      askGemini<{ verdict: Verdict }>(geminiApiKey, relationPrompt(SOURCES[item.source], item.claim), VERDICT_SCHEMA),
+    ),
+  );
+  return {
+    results: CLAIMS.map((item, i) => ({ id: item.id, verdict: calls[i].value.verdict })),
+    elapsedMs: performance.now() - start,
+    inputTokens: calls.reduce((s, c) => s + c.inputTokens, 0),
+    outputTokens: calls.reduce((s, c) => s + c.outputTokens, 0),
+    costUsd: calls.reduce((s, c) => s + c.costUsd, 0),
+  };
 }

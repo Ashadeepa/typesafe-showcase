@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ApiKeyProvider } from "@/lib/api-key-context";
+import { GeminiKeyProvider } from "@/lib/gemini-key-context";
 import ApiKeyBar from "@/components/ApiKeyBar";
 
 const geistSans = Geist({
@@ -38,8 +39,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           GitHub
         </a>
         <ApiKeyProvider>
-          <ApiKeyBar />
-          {children}
+          <GeminiKeyProvider>
+            <ApiKeyBar />
+            {children}
+          </GeminiKeyProvider>
         </ApiKeyProvider>
       </body>
     </html>

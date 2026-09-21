@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { classifyBilling } from "./actions";
+import { classifyBilling, classifyBillingGemini } from "./actions";
 import { TICKETS, type Ticket } from "@/lib/data";
 import { useApiKey } from "@/lib/api-key-context";
+import { useGeminiKey } from "@/lib/gemini-key-context";
 
 const TOTAL_ROUNDS = 10;
 const PLAYER_TIMEOUT_MS = 5000;
@@ -21,9 +22,13 @@ interface RoundTracker {
   jevMs: number | null;
   jevConfidence: number | null;
   resolved: boolean;
+  geminiAnswer: boolean | null;
+  geminiMs: number | null;
+  geminiCostUsd: number | null;
 }
 
 interface RoundResult {
+  roundId: number;
   ticket: Ticket;
   playerAnswer: PlayerAnswer;
   playerMs: number | null;
@@ -31,6 +36,9 @@ interface RoundResult {
   jevMs: number;
   confidence: number;
   outcome: Outcome;
+  geminiAnswer?: boolean;
+  geminiMs?: number;
+  geminiCostUsd?: number;
 }
 
 type Phase = "idle" | "playing" | "roundResult" | "error" | "finished";
@@ -57,6 +65,7 @@ function fmtMs(ms: number | null): string {
 
 export default function ReflexGame() {
   const { apiKey } = useApiKey();
+  const { geminiKey } = useGeminiKey();
   const [phase, setPhase] = useState<Phase>("idle");
   const [round, setRound] = useState(0);
   const [ticket, setTicket] = useState<Ticket | null>(null);
@@ -79,6 +88,8 @@ export default function ReflexGame() {
   // stale-closure chain without needing a fresh render.
   const apiKeyRef = useRef(apiKey);
   apiKeyRef.current = apiKey;
+  const geminiKeyRef = useRef(geminiKey);
+  geminiKeyRef.current = geminiKey;
 
   useEffect(
     () => () => {
@@ -109,6 +120,7 @@ export default function ReflexGame() {
     }
 
     const result: RoundResult = {
+      roundId: r.id,
       ticket: r.ticket,
       playerAnswer: r.playerAnswer,
       playerMs: r.playerAnswer === "timeout" ? null : r.playerMs,
@@ -116,6 +128,9 @@ export default function ReflexGame() {
       jevMs: r.jevMs!,
       confidence: r.jevConfidence!,
       outcome,
+      ...(r.geminiMs !== null
+        ? { geminiAnswer: r.geminiAnswer!, geminiMs: r.geminiMs, geminiCostUsd: r.geminiCostUsd! }
+        : {}),
     };
 
     setScore((s) => s + OUTCOME_META[outcome].points);
@@ -154,6 +169,9 @@ export default function ReflexGame() {
       jevMs: null,
       jevConfidence: null,
       resolved: false,
+      geminiAnswer: null,
+      geminiMs: null,
+      geminiCostUsd: null,
     };
     roundRef.current = tracker;
 
@@ -180,6 +198,32 @@ export default function ReflexGame() {
         setError(e instanceof Error ? e.message : "Something went wrong calling TypeSafe.");
         setPhase("error");
       });
+
+    // Fire-and-forget: purely a passive latency/agreement comparison, never part of the race.
+    // Gemini usually answers well before finishRound runs (the player's 5s timeout dwarfs its
+    // ~1s response), so the common path writes onto the tracker for finishRound to pick up; the
+    // patch-by-roundId path only matters for the rarer case where it resolves after the round
+    // (and its 1.8s result display) has already finished.
+    if (geminiKeyRef.current) {
+      const t0 = tracker.t0;
+      classifyBillingGemini(geminiKeyRef.current, nextTicket.text)
+        .then((verdict) => {
+          const r = roundRef.current;
+          const geminiMs = performance.now() - t0;
+          if (r && r.id === id && !r.resolved) {
+            r.geminiAnswer = verdict.isBilling;
+            r.geminiMs = geminiMs;
+            r.geminiCostUsd = verdict.costUsd;
+            return;
+          }
+          const patch = { geminiAnswer: verdict.isBilling, geminiMs, geminiCostUsd: verdict.costUsd };
+          setHistory((h) => h.map((res) => (res.roundId === id ? { ...res, ...patch } : res)));
+          setLastResult((lr) => (lr && lr.roundId === id ? { ...lr, ...patch } : lr));
+        })
+        .catch(() => {
+          // A failed comparison call is never surfaced as a game error — it's purely informational.
+        });
+    }
   }
 
   function answer(choice: boolean) {
@@ -229,6 +273,9 @@ export default function ReflexGame() {
   const agreementRate = history.length
     ? history.filter((h) => h.outcome === "won" || h.outcome === "lost").length / history.length
     : 0;
+  const withGemini = history.filter((h) => h.geminiMs !== undefined);
+  const avgGeminiMs = withGemini.length ? withGemini.reduce((s, h) => s + (h.geminiMs ?? 0), 0) / withGemini.length : 0;
+  const geminiCostTotal = withGemini.reduce((s, h) => s + (h.geminiCostUsd ?? 0), 0);
 
   return (
     <div className="flex flex-col gap-4">
@@ -311,6 +358,11 @@ export default function ReflexGame() {
               {fmtMs(lastResult.playerMs)}) · Jev: {lastResult.jevAnswer ? "Billing" : "Not billing"} (
               {fmtMs(lastResult.jevMs)}, conf {lastResult.confidence.toFixed(2)})
             </p>
+            {lastResult.geminiMs !== undefined && (
+              <p className="text-xs text-ink-muted">
+                Gemini: {lastResult.geminiAnswer ? "Billing" : "Not billing"} ({fmtMs(lastResult.geminiMs)})
+              </p>
+            )}
           </>
         )}
 
@@ -325,6 +377,12 @@ export default function ReflexGame() {
               Avg your reaction: {avgPlayerMs ? Math.round(avgPlayerMs) : "—"}ms · avg Jev response:{" "}
               {Math.round(avgJevMs)}ms · agreement rate {(agreementRate * 100).toFixed(0)}%
             </p>
+            {withGemini.length > 0 && (
+              <p className="text-xs text-ink-muted">
+                Avg Gemini response: {Math.round(avgGeminiMs)}ms · ${geminiCostTotal.toFixed(5)} total (
+                {withGemini.length} of {history.length} rounds)
+              </p>
+            )}
             <button
               onClick={startGame}
               className="mt-1 rounded-md px-4 py-2 text-sm font-medium text-white"

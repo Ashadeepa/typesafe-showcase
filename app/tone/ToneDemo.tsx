@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { runToneCheck, runToneCheckCustom, type NoteResult } from "./actions";
+import { runToneCheck, runToneCheckCustom, runGeminiToneCheck, type NoteResult, type GeminiToneResult } from "./actions";
 import { NOTES } from "@/lib/data";
 import { useApiKey } from "@/lib/api-key-context";
+import { useGeminiKey } from "@/lib/gemini-key-context";
+import CompareStrip from "@/components/CompareStrip";
 
 const MAX_SCORE = 3;
 
@@ -109,35 +111,84 @@ function TryYourOwn() {
 
 export default function ToneDemo() {
   const { apiKey } = useApiKey();
+  const { geminiKey } = useGeminiKey();
   const [results, setResults] = useState<NoteResult[] | null>(null);
+  const [jevMs, setJevMs] = useState<number | null>(null);
+  const [geminiResult, setGeminiResult] = useState<GeminiToneResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [geminiPending, startGeminiTransition] = useTransition();
 
   const run = () => {
     setError(null);
     startTransition(async () => {
       try {
-        setResults(await runToneCheck(apiKey));
+        const start = performance.now();
+        const r = await runToneCheck(apiKey);
+        setJevMs(performance.now() - start);
+        setResults(r);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Something went wrong calling TypeSafe.");
       }
     });
   };
 
+  const runGeminiCompare = () => {
+    setError(null);
+    startGeminiTransition(async () => {
+      try {
+        setGeminiResult(await runGeminiToneCheck(geminiKey));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Something went wrong calling Gemini.");
+      }
+    });
+  };
+
   const champion = results?.[0];
+
+  let compareStats: { jevMs: number; geminiMs: number; geminiCostUsd: number; agreementPct: number; n: number } | null = null;
+  if (results && jevMs !== null && geminiResult) {
+    const scoreById = new Map(results.map((r) => [r.id, r.score]));
+    const bucket = (s: number) => Math.min(3, Math.max(0, Math.round(s)));
+    let agree = 0;
+    for (const g of geminiResult.results) {
+      const jevScore = scoreById.get(g.id);
+      if (jevScore !== undefined && bucket(jevScore) === bucket(g.score)) agree++;
+    }
+    compareStats = {
+      jevMs,
+      geminiMs: geminiResult.elapsedMs,
+      geminiCostUsd: geminiResult.costUsd,
+      agreementPct: geminiResult.results.length ? agree / geminiResult.results.length : 0,
+      n: geminiResult.results.length,
+    };
+  }
 
   return (
     <div className="flex flex-col gap-6">
       <TryYourOwn />
 
-      <button
-        onClick={run}
-        disabled={pending || !apiKey}
-        className="self-start rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        style={{ backgroundColor: "var(--series-1)" }}
-      >
-        {pending ? "Reading the room…" : "Run the meter"}
-      </button>
+      <div className="flex flex-wrap gap-3">
+        <button
+          onClick={run}
+          disabled={pending || !apiKey}
+          className="self-start rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          style={{ backgroundColor: "var(--series-1)" }}
+        >
+          {pending ? "Reading the room…" : "Run the meter"}
+        </button>
+        {geminiKey && results && (
+          <button
+            onClick={runGeminiCompare}
+            disabled={geminiPending}
+            className="self-start rounded-md border border-border-hairline px-4 py-2 text-sm font-medium text-ink-secondary hover:text-ink-primary disabled:opacity-50"
+          >
+            {geminiPending ? "Comparing with Gemini…" : "Compare with Gemini"}
+          </button>
+        )}
+      </div>
+
+      {compareStats && <CompareStrip {...compareStats} />}
 
       {error && (
         <p

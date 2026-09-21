@@ -3,6 +3,7 @@
 import "server-only";
 import { choice, noul } from "@typesafe-ai/sdk";
 import { requireClient } from "@/lib/typesafe-client";
+import { askGemini } from "@/lib/gemini";
 import { COLLAPSE_THRESHOLD } from "@/lib/jenga-data";
 
 const QUESTION_ID = "holds";
@@ -80,4 +81,41 @@ export async function chooseWord(
   const picked = Number(response.answers[PICK_ID].choice.replace(/^w/, ""));
   // Defensive: never let an unexpected label stall the game.
   return Number.isInteger(picked) && picked >= 0 && picked < words.length ? picked : 0;
+}
+
+export interface GeminiPullVerdict {
+  holds: boolean;
+  stability: number;
+  latencyMs: number;
+  costUsd: number;
+}
+
+const HOLDS_SCHEMA = {
+  type: "object",
+  properties: { holds_probability: { type: "number" } },
+  required: ["holds_probability"],
+};
+
+function holdsPrompt(original: string, shortened: string) {
+  return (
+    `Does "${shortened}" still convey the same core meaning as "${original}"? The core meaning ` +
+    "survives if the same main actor, action, and target are still recoverable — losing " +
+    "descriptive detail (adjectives, adverbs, articles, minor qualifiers) is fine. It's broken if " +
+    "a key actor, action, or object is missing, the meaning changed to something else, or the " +
+    'result is too fragmented to parse. Respond with only a JSON object: {"holds_probability": ' +
+    "<number between 0 and 1>}."
+  );
+}
+
+/** Same holds-meaning judgment, asked of Gemini instead of Jev — purely for comparison. */
+export async function judgeRemovalGemini(geminiApiKey: string, original: string, shortened: string): Promise<GeminiPullVerdict> {
+  const from = original.trim().slice(0, MAX_LENGTH);
+  const to = shortened.trim().slice(0, MAX_LENGTH);
+  const call = await askGemini<{ holds_probability: number }>(geminiApiKey, holdsPrompt(from, to), HOLDS_SCHEMA);
+  return {
+    holds: call.value.holds_probability > COLLAPSE_THRESHOLD,
+    stability: call.value.holds_probability,
+    latencyMs: call.latencyMs,
+    costUsd: call.costUsd,
+  };
 }
