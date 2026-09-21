@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { chooseAiPlay, judgeBluff } from "./actions";
 import { useApiKey } from "@/lib/api-key-context";
+import styles from "./bluff.module.css";
 
 type Suit = "spade" | "heart" | "diamond" | "club";
 interface Card {
@@ -336,178 +337,134 @@ export default function BluffGame() {
 
   const isRed = (suit: Suit) => RED_SUITS.includes(suit);
 
+  if (phase === "idle") {
+    return (
+      <div className={styles.idleCard}>
+        <h2 className={styles.idleTitle}>Deal the table</h2>
+        <p className={styles.idleText}>
+          Thirteen cards each, dealt from a standard deck. Every hand of 1–4 cards you play must
+          claim the next rank in sequence — true or not.
+        </p>
+        <button onClick={startGame} disabled={!apiKey} className={styles.dealBtn}>
+          Deal cards
+        </button>
+        {!apiKey && <p className={styles.keyHint}>Enter your TypeSafe API key above to play.</p>}
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-5">
-      {phase === "idle" && (
-        <div className="rounded-lg border border-border-hairline bg-chart-surface p-5">
-          <h2 className="text-sm font-semibold text-ink-primary">Deal the table</h2>
-          <p className="mt-1 text-xs text-ink-muted">
-            Thirteen cards each, dealt from a standard deck. Every hand of 1–4 cards you play
-            must claim the next rank in sequence — true or not.
-          </p>
-          <button
-            onClick={startGame}
-            disabled={!apiKey}
-            className="mt-4 rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-            style={{ backgroundColor: "var(--status-critical)" }}
-          >
-            Deal cards
-          </button>
-          {!apiKey && <p className="mt-3 text-xs text-ink-muted">Enter your TypeSafe API key above to play.</p>}
-        </div>
-      )}
-
-      {phase !== "idle" && (
-        <>
-          <div className="grid grid-cols-3 gap-3">
-            {OPPONENTS.map((p) => (
-              <div
-                key={p.id}
-                className="rounded-lg border p-3 text-center transition-colors"
-                style={{
-                  borderColor: turnIndex === p.id && phase === "running" ? "var(--status-critical)" : "var(--border-hairline)",
-                  backgroundColor: "var(--chart-surface)",
-                }}
-              >
-                <p className="truncate text-sm font-semibold text-ink-primary">{p.name}</p>
-                <p className="mt-1 text-xs tabular-nums text-ink-muted">{counts[p.id] ?? 0} cards</p>
-                <p className="mt-1 min-h-[1em] text-[0.68rem] italic text-ink-muted">{statusById[p.id] || " "}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex items-center justify-center gap-4 rounded-lg border border-border-hairline bg-chart-surface p-4">
-            <div className="flex items-center gap-1 text-xs text-ink-muted">
-              <span className="tabular-nums">{pileCount}</span> in the pile
-            </div>
-            <div className="text-center">
-              <p className="text-xs uppercase tracking-wide text-ink-muted">Current claim</p>
-              <p className="text-lg font-semibold" style={{ color: "var(--status-critical)" }}>
-                {phase === "over" ? "—" : PLURAL[claimedRank]}
-              </p>
-            </div>
-          </div>
-
-          {prompt && (
-            <div className="rounded-lg border p-4" style={{ borderColor: "var(--status-critical)" }}>
-              <p className="text-sm text-ink-primary">{prompt.body}</p>
-              <div className="mt-3 flex gap-2">
-                <button
-                  onClick={() => promptResolveRef.current?.(true)}
-                  className="rounded-md px-4 py-2 text-sm font-medium text-white"
-                  style={{ backgroundColor: "var(--status-critical)" }}
-                >
-                  Call bluff
-                </button>
-                <button
-                  onClick={() => promptResolveRef.current?.(false)}
-                  className="rounded-md border border-border-hairline px-4 py-2 text-sm text-ink-secondary hover:text-ink-primary"
-                >
-                  Let it lie
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="rounded-lg border border-border-hairline bg-chart-surface p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-ink-primary">Your hand</p>
-              <p className="text-xs tabular-nums text-ink-muted">{hand.length} cards</p>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {hand.map((card, i) => {
-                const isSelected = selected.includes(card);
-                return (
-                  <button
-                    key={`${card.rank}${card.suit}-${i}`}
-                    onClick={() => selecting && toggleCard(card)}
-                    disabled={!selecting}
-                    className={`flex h-16 w-11 flex-none flex-col justify-between rounded-md border px-1.5 py-1 font-mono text-xs font-semibold transition-transform ${
-                      selecting ? "cursor-pointer" : "cursor-default opacity-90"
-                    } ${isSelected ? "-translate-y-2" : ""}`}
-                    style={{
-                      backgroundColor: "var(--background)",
-                      borderColor: isSelected ? "var(--status-critical)" : "var(--border-hairline)",
-                      boxShadow: isSelected ? "0 0 0 1px var(--status-critical)" : "none",
-                      color: isRed(card.suit) ? "var(--status-critical)" : "var(--ink-primary)",
-                    }}
-                  >
-                    <span>{card.rank}{SUIT_SYMBOL[card.suit]}</span>
-                    <span className="self-center text-sm">{SUIT_SYMBOL[card.suit]}</span>
-                    <span className="self-end rotate-180">{card.rank}{SUIT_SYMBOL[card.suit]}</span>
-                  </button>
-                );
-              })}
-            </div>
-            {selecting && (
-              <div className="mt-3 flex items-center gap-3 border-t border-gridline pt-3">
-                <button
-                  onClick={confirmPlay}
-                  disabled={selected.length < 1}
-                  className="rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                  style={{ backgroundColor: "var(--status-critical)" }}
-                >
-                  Play {selected.length || ""} as {PLURAL[claimedRank]}
-                </button>
-                {selected.length > 0 && (
-                  <button
-                    onClick={() => setSelected([])}
-                    className="text-xs text-ink-muted underline hover:text-ink-primary"
-                  >
-                    clear
-                  </button>
-                )}
-              </div>
-            )}
-            {!selecting && phase === "running" && (
-              <p className="mt-3 text-xs text-ink-muted">
-                {turnIndex === 0 ? "Your move." : `${NAMES[turnIndex]} is deciding…`}
-              </p>
-            )}
-          </div>
-
-          {error && (
-            <p className="text-xs" style={{ color: "var(--status-critical)" }}>
-              ⚠ {error}
-            </p>
-          )}
-
-          <div className="max-h-52 overflow-y-auto rounded-lg border border-border-hairline bg-chart-surface p-4 text-sm">
-            {log.map((entry, i) => (
-              <p
-                key={i}
-                className={
-                  entry.tone === "marker"
-                    ? "mt-2 text-xs font-semibold uppercase tracking-wide text-ink-muted first:mt-0"
-                    : entry.tone === "win"
-                      ? "font-semibold"
-                      : "text-ink-secondary"
-                }
-                style={
-                  entry.tone === "warn"
-                    ? { color: "var(--status-serious)" }
-                    : entry.tone === "win"
-                      ? { color: "var(--status-critical)" }
-                      : undefined
-                }
-              >
-                {entry.text}
-              </p>
-            ))}
-            <div ref={logEndRef} />
-          </div>
-
-          {phase === "over" && winner && (
-            <button
-              onClick={startGame}
-              className="self-start rounded-md px-4 py-2 text-sm font-medium text-white"
-              style={{ backgroundColor: "var(--status-critical)" }}
+    <div className={styles.grid}>
+      <div className={styles.mainCol}>
+        <div className={styles.council}>
+          {OPPONENTS.map((p) => (
+            <div
+              key={p.id}
+              className={`${styles.placard} ${turnIndex === p.id && phase === "running" ? styles.placardActive : ""}`}
             >
-              Deal again
-            </button>
+              <p className={styles.placardName}>{p.name}</p>
+              <p className={styles.placardCount}>{counts[p.id] ?? 0} cards</p>
+              <p className={styles.placardStatus}>{statusById[p.id] || " "}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className={styles.tableCenter}>
+          <div className={styles.pileWrap}>
+            <span className={styles.pileCount}>{pileCount}</span> in the pile
+          </div>
+          <div className={styles.claimTag}>
+            Current claim
+            <span className={styles.claimValue}>{phase === "over" ? "—" : PLURAL[claimedRank]}</span>
+          </div>
+        </div>
+
+        {prompt && (
+          <div className={styles.prompt}>
+            <p className={styles.promptBody}>{prompt.body}</p>
+            <div className={styles.promptActions}>
+              <button onClick={() => promptResolveRef.current?.(true)} className={styles.btnDanger}>
+                Call bluff
+              </button>
+              <button onClick={() => promptResolveRef.current?.(false)} className={styles.btnGhost}>
+                Let it lie
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className={styles.handPanel}>
+          <div className={styles.handHeader}>
+            <p className={styles.handTitle}>Your hand</p>
+            <p className={styles.handCount}>{hand.length} cards</p>
+          </div>
+          <div className={styles.handRow}>
+            {hand.map((card, i) => {
+              const isSelected = selected.includes(card);
+              return (
+                <button
+                  key={`${card.rank}${card.suit}-${i}`}
+                  onClick={() => selecting && toggleCard(card)}
+                  disabled={!selecting}
+                  className={[
+                    styles.card,
+                    isRed(card.suit) ? styles.cardRed : "",
+                    selecting ? styles.cardPickable : "",
+                    isSelected ? styles.cardSelected : "",
+                  ].join(" ")}
+                >
+                  <span>{card.rank}{SUIT_SYMBOL[card.suit]}</span>
+                  <span className={styles.cardMid}>{SUIT_SYMBOL[card.suit]}</span>
+                  <span className={styles.cardBottom}>{card.rank}{SUIT_SYMBOL[card.suit]}</span>
+                </button>
+              );
+            })}
+          </div>
+          {selecting && (
+            <div className={styles.playBar}>
+              <button onClick={confirmPlay} disabled={selected.length < 1} className={styles.playBtn}>
+                Play {selected.length || ""} as {PLURAL[claimedRank]}
+              </button>
+              {selected.length > 0 && (
+                <button onClick={() => setSelected([])} className={styles.clearBtn}>
+                  clear
+                </button>
+              )}
+            </div>
           )}
-        </>
-      )}
+          {!selecting && phase === "running" && (
+            <p className={styles.turnHint}>{turnIndex === 0 ? "Your move." : `${NAMES[turnIndex]} is deciding…`}</p>
+          )}
+        </div>
+
+        {error && <p className={styles.errorText}>⚠ {error}</p>}
+
+        {phase === "over" && winner && (
+          <button onClick={startGame} className={styles.dealAgainBtn}>
+            Deal again
+          </button>
+        )}
+      </div>
+
+      <div className={styles.log}>
+        {log.map((entry, i) => (
+          <p
+            key={i}
+            className={
+              entry.tone === "marker"
+                ? styles.logMarker
+                : entry.tone === "warn"
+                  ? styles.logWarn
+                  : entry.tone === "win"
+                    ? styles.logWin
+                    : styles.logLine
+            }
+          >
+            {entry.text}
+          </p>
+        ))}
+        <div ref={logEndRef} />
+      </div>
     </div>
   );
 }

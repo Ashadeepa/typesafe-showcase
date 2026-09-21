@@ -1,0 +1,438 @@
+/*
+ * A deliberately single-theme "candlelit card table" look for this one page — it does not use
+ * the showcase's shared light/dark tokens from globals.css on purpose, so it stays a fixed
+ * world regardless of the visitor's system theme, the same way the original prototype did.
+ */
+
+.page {
+  --ink: #15120e;
+  --ink-2: #1e1912;
+  --ink-3: #2a2219;
+  --seam: #3a2f22;
+  --parchment: #ece2c8;
+  --parchment-dim: #c9bd9e;
+  --gold: #c6a15b;
+  --gold-bright: #e6c17e;
+  --red: #a4342b;
+
+  flex: 1;
+  width: 100%;
+  background:
+    radial-gradient(ellipse 900px 500px at 50% -10%, #241d15 0%, transparent 60%),
+    var(--ink);
+  color: var(--parchment);
+  font-family: var(--font-body), Georgia, serif;
+}
+
+.container {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 2rem 1rem 3rem;
+}
+
+.backLink {
+  font-size: 0.85rem;
+  color: var(--parchment-dim);
+  text-decoration: none;
+}
+.backLink:hover {
+  color: var(--gold-bright);
+}
+
+.pageTitle {
+  margin: 0.5rem 0 0;
+  font-family: var(--font-display), serif;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  font-size: 1.75rem;
+  color: var(--gold-bright);
+  text-wrap: balance;
+}
+
+.pageIntro {
+  margin: 0.6rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--parchment-dim);
+  max-width: 65ch;
+}
+
+.gameSlot {
+  margin-top: 1.5rem;
+}
+
+/* ---- idle / deal screen ---- */
+
+.idleCard {
+  border-radius: 10px;
+  border: 1px solid var(--seam);
+  background: linear-gradient(180deg, var(--ink-2), var(--ink-3));
+  padding: 1.25rem;
+}
+.idleTitle {
+  margin: 0;
+  font-family: var(--font-display), serif;
+  font-size: 0.95rem;
+  letter-spacing: 0.03em;
+  color: var(--parchment);
+}
+.idleText {
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  color: var(--parchment-dim);
+}
+.dealBtn {
+  margin-top: 1rem;
+  font-family: var(--font-display), serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--gold);
+  border: none;
+  border-radius: 7px;
+  padding: 0.65rem 1.1rem;
+  cursor: pointer;
+}
+.dealBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.dealBtn:hover:not(:disabled) {
+  background: var(--gold-bright);
+}
+.keyHint {
+  margin: 0.75rem 0 0;
+  font-size: 0.75rem;
+  color: var(--parchment-dim);
+}
+
+/* ---- layout: main column + right-hand log ---- */
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 260px;
+  gap: 1rem;
+  align-items: start;
+}
+.mainCol {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- opponents ---- */
+
+.council {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+}
+.placard {
+  border-radius: 10px;
+  border: 1px solid var(--seam);
+  background: linear-gradient(180deg, var(--ink-2), var(--ink-3));
+  padding: 0.65rem;
+  text-align: center;
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.placardActive {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px var(--gold) inset;
+}
+.placardName {
+  margin: 0;
+  font-family: var(--font-display), serif;
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  color: var(--parchment);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.placardCount {
+  margin: 0.3rem 0 0;
+  font-family: var(--font-numeric), monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
+  color: var(--parchment-dim);
+}
+.placardStatus {
+  margin: 0.3rem 0 0;
+  min-height: 1em;
+  font-size: 0.66rem;
+  font-style: italic;
+  color: var(--parchment-dim);
+}
+
+/* ---- claim / pile ---- */
+
+.tableCenter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.1rem;
+  border-radius: 10px;
+  border: 1px solid var(--seam);
+  background: var(--ink-2);
+  padding: 0.9rem;
+}
+.pileWrap {
+  font-size: 0.75rem;
+  color: var(--parchment-dim);
+}
+.pileCount {
+  font-family: var(--font-numeric), monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--parchment);
+}
+.claimTag {
+  text-align: center;
+  font-family: var(--font-display), serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--parchment-dim);
+}
+.claimValue {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 1.25rem;
+  letter-spacing: 0.02em;
+  color: var(--gold-bright);
+}
+
+/* ---- prompt ---- */
+
+.prompt {
+  border-radius: 10px;
+  border: 1px solid var(--gold);
+  background: var(--parchment);
+  color: var(--ink);
+  padding: 1rem 1.1rem;
+}
+.promptBody {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.promptActions {
+  margin-top: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+}
+.btnDanger,
+.btnGhost {
+  font-family: var(--font-display), serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-radius: 7px;
+  padding: 0.6rem 0.95rem;
+  cursor: pointer;
+}
+.btnDanger {
+  border: none;
+  background: var(--red);
+  color: var(--parchment);
+}
+.btnGhost {
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  background: transparent;
+  color: var(--ink);
+}
+
+/* ---- hand ---- */
+
+.handPanel {
+  border-radius: 10px;
+  border: 1px solid var(--seam);
+  background: linear-gradient(180deg, var(--ink-2), var(--ink-3));
+  padding: 0.9rem;
+}
+.handHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.handTitle {
+  margin: 0;
+  font-family: var(--font-display), serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  color: var(--parchment);
+}
+.handCount {
+  font-family: var(--font-numeric), monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
+  color: var(--parchment-dim);
+}
+.handRow {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.card {
+  width: 46px;
+  aspect-ratio: 5 / 7;
+  flex: none;
+  border-radius: 5px;
+  background: var(--parchment);
+  color: var(--ink);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 3px 4px;
+  font-family: var(--font-numeric), monospace;
+  font-weight: 600;
+  font-size: 0.7rem;
+  cursor: default;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.cardRed {
+  color: var(--red);
+}
+.cardPickable {
+  cursor: pointer;
+}
+.cardPickable:hover,
+.cardPickable:focus-visible {
+  transform: translateY(-4px);
+  outline: none;
+}
+.cardSelected {
+  transform: translateY(-11px);
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px var(--gold);
+}
+.cardMid {
+  align-self: center;
+  font-size: 1rem;
+}
+.cardBottom {
+  align-self: flex-end;
+  transform: rotate(180deg);
+}
+
+.playBar {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--seam);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.playBtn {
+  font-family: var(--font-display), serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--gold);
+  border: none;
+  border-radius: 7px;
+  padding: 0.6rem 0.95rem;
+  cursor: pointer;
+}
+.playBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.playBtn:hover:not(:disabled) {
+  background: var(--gold-bright);
+}
+.clearBtn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.72rem;
+  color: var(--parchment-dim);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.clearBtn:hover {
+  color: var(--parchment);
+}
+.turnHint {
+  margin: 0.75rem 0 0;
+  font-size: 0.78rem;
+  color: var(--parchment-dim);
+}
+
+.errorText {
+  font-size: 0.78rem;
+  color: var(--red);
+}
+
+.dealAgainBtn {
+  align-self: flex-start;
+  font-family: var(--font-display), serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--gold);
+  border: none;
+  border-radius: 7px;
+  padding: 0.65rem 1.1rem;
+  cursor: pointer;
+}
+.dealAgainBtn:hover {
+  background: var(--gold-bright);
+}
+
+/* ---- log sidebar ---- */
+
+.log {
+  border-radius: 10px;
+  border: 1px solid var(--seam);
+  background: var(--ink-2);
+  padding: 0.9rem 1rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  min-height: 220px;
+  max-height: 480px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+@media (max-width: 720px) {
+  .log {
+    max-height: 240px;
+  }
+}
+.logLine {
+  margin: 0;
+  color: var(--parchment-dim);
+}
+.logMarker {
+  margin-top: 0.4rem;
+  font-family: var(--font-display), serif;
+  font-size: 0.66rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.logMarker:first-child {
+  margin-top: 0;
+}
+.logWarn {
+  color: #d98f88;
+}
+.logWin {
+  font-family: var(--font-display), serif;
+  letter-spacing: 0.02em;
+  color: var(--gold-bright);
+}
