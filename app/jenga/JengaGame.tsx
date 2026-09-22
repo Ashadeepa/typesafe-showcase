@@ -98,13 +98,16 @@ export default function JengaGame() {
       const verdict = await judgeRemoval(apiKey, original, candidate);
       const jevMs = performance.now() - jevStart;
 
-      // Fire-and-forget: purely informational, never blocks the actual pull or its outcome.
+      // Fire-and-forget: purely informational, never blocks the actual pull or its outcome. Timed
+      // client-side the same way jevMs is (not the server-internal `latencyMs`), so both numbers
+      // include the same round-trip to this app's own server and are comparable.
       if (compareKey) {
         const base = { jevMs, jevStability: verdict.stability, jevInputTokens: verdict.inputTokens, jevOutputTokens: verdict.outputTokens };
+        const otherStart = performance.now();
         judgeRemovalCompare(provider, compareKey, original, candidate)
           .then((other) =>
             setCompareLog((l) =>
-              [...l, { ...base, otherMs: other.latencyMs, otherStability: other.stability, otherCostUsd: other.costUsd }].slice(-20),
+              [...l, { ...base, otherMs: performance.now() - otherStart, otherStability: other.stability, otherCostUsd: other.costUsd }].slice(-20),
             ),
           )
           .catch((e) =>

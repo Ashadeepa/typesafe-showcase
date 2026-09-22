@@ -169,14 +169,16 @@ async function decideAiCall(
 
   // Fire-and-forget: the comparison is purely informational and must never slow the AI down or
   // affect the outcome — the other model's answer is reported side by side, not consulted for
-  // the call.
+  // the call. Timed client-side the same way jevMs is (not the server-internal `latencyMs`),
+  // so both numbers include the same round-trip to this app's own server and are comparable.
   if (compareApiKey) {
     const base = { jevMs, jevProbability: bluffProbability, jevInputTokens, jevOutputTokens };
+    const otherStart = performance.now();
     judgeBluffCompare(compareProvider, compareApiKey, play.claimedRank, play.cards.length, ownCount)
       .then((other) =>
         onCompare({
           ...base,
-          otherMs: other.latencyMs,
+          otherMs: performance.now() - otherStart,
           otherProbability: other.bluffProbability,
           otherCostUsd: other.costUsd,
         }),
