@@ -58,7 +58,6 @@ holds the provider type and display labels so client components never import the
   dashboard style the other demos use. Every bluff-call judgment also runs the same question past
   the comparison model in parallel — fire-and-forget, never consulted for the actual call.
 
-Ported from the Python demos in [typesafe-jev-model-use-cases](https://github.com/Ashadeepa/typesafe-jev-model-use-cases).
 
 ## Local development
 
