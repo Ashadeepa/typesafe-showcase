@@ -11,6 +11,8 @@ import CompareStrip from "@/components/CompareStrip";
 interface CompareEntry {
   jevMs: number;
   jevStability: number;
+  jevInputTokens: number;
+  jevOutputTokens: number;
   otherMs?: number;
   otherStability?: number;
   otherCostUsd?: number;
@@ -98,15 +100,16 @@ export default function JengaGame() {
 
       // Fire-and-forget: purely informational, never blocks the actual pull or its outcome.
       if (compareKey) {
+        const base = { jevMs, jevStability: verdict.stability, jevInputTokens: verdict.inputTokens, jevOutputTokens: verdict.outputTokens };
         judgeRemovalCompare(provider, compareKey, original, candidate)
           .then((other) =>
             setCompareLog((l) =>
-              [...l, { jevMs, jevStability: verdict.stability, otherMs: other.latencyMs, otherStability: other.stability, otherCostUsd: other.costUsd }].slice(-20),
+              [...l, { ...base, otherMs: other.latencyMs, otherStability: other.stability, otherCostUsd: other.costUsd }].slice(-20),
             ),
           )
           .catch((e) =>
             setCompareLog((l) =>
-              [...l, { jevMs, jevStability: verdict.stability, otherError: e instanceof Error ? e.message : "Comparison call failed." }].slice(-20),
+              [...l, { ...base, otherError: e instanceof Error ? e.message : "Comparison call failed." }].slice(-20),
             ),
           );
       }
@@ -129,7 +132,9 @@ export default function JengaGame() {
     }
   }
 
-  let compareStats: { jevMs: number; otherMs: number; otherCostUsd: number; agreementPct: number; n: number; providerLabel: string } | null = null;
+  let compareStats:
+    | { jevMs: number; jevInputTokens: number; jevOutputTokens: number; otherMs: number; otherCostUsd: number; agreementPct: number; n: number; providerLabel: string }
+    | null = null;
   const settledCompares = compareLog.filter((c) => c.otherMs !== undefined);
   if (settledCompares.length > 0) {
     let agree = 0;
@@ -138,6 +143,8 @@ export default function JengaGame() {
     }
     compareStats = {
       jevMs: settledCompares.reduce((s, c) => s + c.jevMs, 0) / settledCompares.length,
+      jevInputTokens: settledCompares.reduce((s, c) => s + c.jevInputTokens, 0),
+      jevOutputTokens: settledCompares.reduce((s, c) => s + c.jevOutputTokens, 0),
       otherMs: settledCompares.reduce((s, c) => s + (c.otherMs as number), 0) / settledCompares.length,
       otherCostUsd: settledCompares.reduce((s, c) => s + (c.otherCostUsd ?? 0), 0),
       agreementPct: agree / settledCompares.length,

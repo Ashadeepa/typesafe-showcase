@@ -45,6 +45,8 @@ interface EngineCallbacks {
 interface CompareEntry {
   jevMs: number;
   jevProbability: number;
+  jevInputTokens: number;
+  jevOutputTokens: number;
   otherMs?: number;
   otherProbability?: number;
   otherCostUsd?: number;
@@ -152,9 +154,13 @@ async function decideAiCall(
 
   const jevStart = performance.now();
   let bluffProbability: number;
+  let jevInputTokens = 0;
+  let jevOutputTokens = 0;
   try {
     const r = await judgeBluff(apiKey, play.claimedRank, play.cards.length, ownCount);
     bluffProbability = r.bluffProbability;
+    jevInputTokens = r.inputTokens;
+    jevOutputTokens = r.outputTokens;
   } catch (e) {
     onError(e instanceof Error ? e.message : "The call to TypeSafe failed.");
     bluffProbability = Math.min(0.85, 0.1 + (play.cards.length - 1) * 0.08 + ownCount * 0.15);
@@ -165,19 +171,17 @@ async function decideAiCall(
   // affect the outcome — the other model's answer is reported side by side, not consulted for
   // the call.
   if (compareApiKey) {
+    const base = { jevMs, jevProbability: bluffProbability, jevInputTokens, jevOutputTokens };
     judgeBluffCompare(compareProvider, compareApiKey, play.claimedRank, play.cards.length, ownCount)
       .then((other) =>
         onCompare({
-          jevMs,
-          jevProbability: bluffProbability,
+          ...base,
           otherMs: other.latencyMs,
           otherProbability: other.bluffProbability,
           otherCostUsd: other.costUsd,
         }),
       )
-      .catch((e) =>
-        onCompare({ jevMs, jevProbability: bluffProbability, otherError: e instanceof Error ? e.message : "Comparison call failed." }),
-      );
+      .catch((e) => onCompare({ ...base, otherError: e instanceof Error ? e.message : "Comparison call failed." }));
   }
 
   return Math.random() < bluffProbability;
@@ -280,6 +284,8 @@ function average(arr: number[]) {
 
 function ComparePanel({ entries, providerLabel }: { entries: CompareEntry[]; providerLabel: string }) {
   const jevTimes = entries.map((e) => e.jevMs);
+  const jevInputTokens = entries.reduce((s, e) => s + e.jevInputTokens, 0);
+  const jevOutputTokens = entries.reduce((s, e) => s + e.jevOutputTokens, 0);
   const otherEntries = entries.filter((e) => e.otherMs !== undefined);
   const otherTimes = otherEntries.map((e) => e.otherMs as number);
   const totalCost = otherEntries.reduce((sum, e) => sum + (e.otherCostUsd ?? 0), 0);
@@ -294,7 +300,9 @@ function ComparePanel({ entries, providerLabel }: { entries: CompareEntry[]; pro
       <div className={styles.compareSummary}>
         <div className={styles.compareRow}>
           <span className={styles.compareModelName}>Jev</span>
-          <span className={styles.compareStat}>{average(jevTimes).toFixed(0)}ms avg</span>
+          <span className={styles.compareStat}>
+            {average(jevTimes).toFixed(0)}ms avg · {jevInputTokens}/{jevOutputTokens} tok
+          </span>
         </div>
         <div className={styles.compareRow}>
           <span className={styles.compareModelName}>{providerLabel}</span>

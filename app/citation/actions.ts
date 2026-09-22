@@ -16,6 +16,8 @@ export interface ClaimResult {
   verdict: Verdict;
   confidence: number;
   probabilities: Record<Verdict, number>;
+  inputTokens: number;
+  outputTokens: number;
 }
 
 const QUESTION_ID = "relation";
@@ -47,6 +49,8 @@ async function checkAgainstSource(
     verdict: answer.choice as Verdict,
     confidence: answer.confidence,
     probabilities: answer.probabilities as Record<Verdict, number>,
+    inputTokens: response.usage.input_tokens,
+    outputTokens: response.usage.output_tokens,
   };
 }
 

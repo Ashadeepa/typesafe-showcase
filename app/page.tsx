@@ -10,14 +10,6 @@ const USE_CASES = [
       "The classic bluffing card game against three AI opponents, each asking Jev how plausible your claim is before calling bluff.",
   },
   {
-    href: "/parallel",
-    title: "Parallel processing",
-    primitive: "Noul",
-    color: "var(--series-1)",
-    description:
-      "16 support tickets, judged “is this about billing?” one at a time vs. all at once — same answers, ~5x faster.",
-  },
-  {
     href: "/citation",
     title: "Citation / claim check",
     primitive: "Choice",
@@ -48,6 +40,14 @@ const USE_CASES = [
     color: "var(--status-warning)",
     description:
       "Pull words out of a sentence one at a time. The probability Jev returns is the tower's structural integrity.",
+  },
+  {
+    href: "/parallel",
+    title: "Parallel processing",
+    primitive: "Noul",
+    color: "var(--series-1)",
+    description:
+      "16 support tickets, judged “is this about billing?” one at a time vs. all at once — same answers, ~5x faster.",
   },
 ] as const;
 

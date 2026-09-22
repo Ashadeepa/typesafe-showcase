@@ -145,9 +145,11 @@ export default function ParallelDemo() {
     noulById.set(r.id, r.isBillingNoul);
   }
 
-  let compareStats: { jevMs: number; otherMs: number; otherCostUsd: number; agreementPct: number; n: number; providerLabel: string } | null = null;
+  let compareStats:
+    | { jevMs: number; jevInputTokens: number; jevOutputTokens: number; otherMs: number; otherCostUsd: number; agreementPct: number; n: number; providerLabel: string }
+    | null = null;
   if (compareRun && (runs.parallel || runs.sequential)) {
-    const jevMs = (runs.parallel ?? runs.sequential)!.elapsedMs;
+    const jevRun = (runs.parallel ?? runs.sequential)!;
     let agree = 0;
     for (const g of compareRun.results) {
       const jevSaysBilling = (noulById.get(g.id) ?? 0) > 0.5;
@@ -155,7 +157,9 @@ export default function ParallelDemo() {
       if (jevSaysBilling === otherSaysBilling) agree++;
     }
     compareStats = {
-      jevMs,
+      jevMs: jevRun.elapsedMs,
+      jevInputTokens: jevRun.inputTokens,
+      jevOutputTokens: jevRun.outputTokens,
       otherMs: compareRun.elapsedMs,
       otherCostUsd: compareRun.costUsd,
       agreementPct: compareRun.results.length ? agree / compareRun.results.length : 0,

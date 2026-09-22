@@ -27,6 +27,8 @@ function holdsQuestion() {
 export interface PullVerdict {
   holds: boolean;
   stability: number;
+  inputTokens: number;
+  outputTokens: number;
 }
 
 export async function judgeRemoval(
@@ -44,7 +46,12 @@ export async function judgeRemoval(
     questions: { [QUESTION_ID]: holdsQuestion() },
   });
   const answer = response.answers[QUESTION_ID];
-  return { holds: answer.noul > COLLAPSE_THRESHOLD, stability: answer.noul };
+  return {
+    holds: answer.noul > COLLAPSE_THRESHOLD,
+    stability: answer.noul,
+    inputTokens: response.usage.input_tokens,
+    outputTokens: response.usage.output_tokens,
+  };
 }
 
 const PICK_ID = "pick";

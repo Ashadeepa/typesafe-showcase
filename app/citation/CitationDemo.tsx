@@ -135,7 +135,9 @@ export default function CitationDemo() {
     (r) => r.verdict !== "supports" || r.confidence < CONFIDENCE_THRESHOLD,
   );
 
-  let compareStats: { jevMs: number; otherMs: number; otherCostUsd: number; agreementPct: number; n: number; providerLabel: string } | null = null;
+  let compareStats:
+    | { jevMs: number; jevInputTokens: number; jevOutputTokens: number; otherMs: number; otherCostUsd: number; agreementPct: number; n: number; providerLabel: string }
+    | null = null;
   if (results && jevMs !== null && compareResult) {
     const verdictById = new Map(results.map((r) => [r.id, r.verdict]));
     let agree = 0;
@@ -144,6 +146,8 @@ export default function CitationDemo() {
     }
     compareStats = {
       jevMs,
+      jevInputTokens: results.reduce((s, r) => s + r.inputTokens, 0),
+      jevOutputTokens: results.reduce((s, r) => s + r.outputTokens, 0),
       otherMs: compareResult.elapsedMs,
       otherCostUsd: compareResult.costUsd,
       agreementPct: compareResult.results.length ? agree / compareResult.results.length : 0,

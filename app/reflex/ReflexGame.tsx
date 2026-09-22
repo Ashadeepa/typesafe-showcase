@@ -22,6 +22,8 @@ interface RoundTracker {
   jevAnswer: boolean | null;
   jevMs: number | null;
   jevConfidence: number | null;
+  jevInputTokens: number | null;
+  jevOutputTokens: number | null;
   resolved: boolean;
   otherAnswer: boolean | null;
   otherMs: number | null;
@@ -36,6 +38,8 @@ interface RoundResult {
   jevAnswer: boolean;
   jevMs: number;
   confidence: number;
+  jevInputTokens: number;
+  jevOutputTokens: number;
   outcome: Outcome;
   otherAnswer?: boolean;
   otherMs?: number;
@@ -130,6 +134,8 @@ export default function ReflexGame() {
       jevAnswer: r.jevAnswer,
       jevMs: r.jevMs!,
       confidence: r.jevConfidence!,
+      jevInputTokens: r.jevInputTokens!,
+      jevOutputTokens: r.jevOutputTokens!,
       outcome,
       ...(r.otherMs !== null ? { otherAnswer: r.otherAnswer!, otherMs: r.otherMs, otherCostUsd: r.otherCostUsd! } : {}),
     };
@@ -169,6 +175,8 @@ export default function ReflexGame() {
       jevAnswer: null,
       jevMs: null,
       jevConfidence: null,
+      jevInputTokens: null,
+      jevOutputTokens: null,
       resolved: false,
       otherAnswer: null,
       otherMs: null,
@@ -191,6 +199,8 @@ export default function ReflexGame() {
         r.jevAnswer = verdict.isBilling;
         r.jevMs = performance.now() - r.t0;
         r.jevConfidence = verdict.noul;
+        r.jevInputTokens = verdict.inputTokens;
+        r.jevOutputTokens = verdict.outputTokens;
         finishRound(r);
       })
       .catch((e) => {
@@ -271,6 +281,8 @@ export default function ReflexGame() {
   const decided = history.filter((h) => h.playerMs !== null);
   const avgPlayerMs = decided.length ? decided.reduce((s, h) => s + (h.playerMs ?? 0), 0) / decided.length : 0;
   const avgJevMs = history.length ? history.reduce((s, h) => s + h.jevMs, 0) / history.length : 0;
+  const jevInputTokensTotal = history.reduce((s, h) => s + h.jevInputTokens, 0);
+  const jevOutputTokensTotal = history.reduce((s, h) => s + h.jevOutputTokens, 0);
   const agreementRate = history.length
     ? history.filter((h) => h.outcome === "won" || h.outcome === "lost").length / history.length
     : 0;
@@ -378,6 +390,9 @@ export default function ReflexGame() {
             <p className="text-xs text-ink-muted">
               Avg your reaction: {avgPlayerMs ? Math.round(avgPlayerMs) : "—"}ms · avg Jev response:{" "}
               {Math.round(avgJevMs)}ms · agreement rate {(agreementRate * 100).toFixed(0)}%
+            </p>
+            <p className="text-xs text-ink-muted">
+              Jev tokens: {jevInputTokensTotal}/{jevOutputTokensTotal} total ({history.length} rounds)
             </p>
             {withOther.length > 0 && (
               <p className="text-xs text-ink-muted">

@@ -1,6 +1,8 @@
 export interface CompareStripProps {
   n: number;
   jevMs: number;
+  jevInputTokens: number;
+  jevOutputTokens: number;
   otherMs: number;
   otherCostUsd: number;
   agreementPct: number;
@@ -8,7 +10,16 @@ export interface CompareStripProps {
 }
 
 /** Shared aggregate Jev-vs-comparison-model summary, used across every demo's comparison UI. */
-export default function CompareStrip({ n, jevMs, otherMs, otherCostUsd, agreementPct, providerLabel }: CompareStripProps) {
+export default function CompareStrip({
+  n,
+  jevMs,
+  jevInputTokens,
+  jevOutputTokens,
+  otherMs,
+  otherCostUsd,
+  agreementPct,
+  providerLabel,
+}: CompareStripProps) {
   return (
     <div className="rounded-lg border border-border-hairline bg-chart-surface p-4">
       <p className="mb-2 text-xs uppercase tracking-wide text-ink-muted">
@@ -16,7 +27,11 @@ export default function CompareStrip({ n, jevMs, otherMs, otherCostUsd, agreemen
       </p>
       <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm text-ink-secondary">
         <span>
-          Jev <b className="tabular-nums text-ink-primary">{Math.round(jevMs)}ms</b>
+          Jev <b className="tabular-nums text-ink-primary">{Math.round(jevMs)}ms</b> ·{" "}
+          <b className="tabular-nums text-ink-primary">
+            {jevInputTokens}/{jevOutputTokens}
+          </b>{" "}
+          tok
         </span>
         <span>
           {providerLabel} <b className="tabular-nums text-ink-primary">{Math.round(otherMs)}ms</b> ·{" "}

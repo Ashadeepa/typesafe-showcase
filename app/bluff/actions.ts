@@ -25,6 +25,8 @@ function bluffQuestion() {
 
 export interface BluffVerdict {
   bluffProbability: number;
+  inputTokens: number;
+  outputTokens: number;
 }
 
 /**
@@ -47,7 +49,11 @@ export async function judgeBluff(
     },
     questions: { [QUESTION_ID]: bluffQuestion() },
   });
-  return { bluffProbability: response.answers[QUESTION_ID].noul };
+  return {
+    bluffProbability: response.answers[QUESTION_ID].noul,
+    inputTokens: response.usage.input_tokens,
+    outputTokens: response.usage.output_tokens,
+  };
 }
 
 const STRATEGY_ID = "strategy";

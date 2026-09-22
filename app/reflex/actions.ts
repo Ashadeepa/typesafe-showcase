@@ -21,6 +21,8 @@ function billingQuestion() {
 export interface BillingVerdict {
   isBilling: boolean;
   noul: number;
+  inputTokens: number;
+  outputTokens: number;
 }
 
 export async function classifyBilling(apiKey: string, text: string): Promise<BillingVerdict> {
@@ -33,7 +35,12 @@ export async function classifyBilling(apiKey: string, text: string): Promise<Bil
     questions: { [QUESTION_ID]: billingQuestion() },
   });
   const answer = response.answers[QUESTION_ID];
-  return { isBilling: answer.noul > 0.5, noul: answer.noul };
+  return {
+    isBilling: answer.noul > 0.5,
+    noul: answer.noul,
+    inputTokens: response.usage.input_tokens,
+    outputTokens: response.usage.output_tokens,
+  };
 }
 
 export interface CompareBillingVerdict {

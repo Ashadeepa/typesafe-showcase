@@ -35,6 +35,8 @@ export interface NoteResult {
   score: number;
   confidence: number;
   levelLabel: string;
+  inputTokens: number;
+  outputTokens: number;
 }
 
 async function judgeOne(client: TypeSafeClient, note: (typeof NOTES)[number]): Promise<NoteResult> {
@@ -51,6 +53,8 @@ async function judgeOne(client: TypeSafeClient, note: (typeof NOTES)[number]): P
     score: answer.score,
     confidence: answer.confidence,
     levelLabel: LEVELS[roundedLevel].split(":")[0],
+    inputTokens: response.usage.input_tokens,
+    outputTokens: response.usage.output_tokens,
   };
 }
 

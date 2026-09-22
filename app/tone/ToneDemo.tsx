@@ -147,7 +147,9 @@ export default function ToneDemo() {
 
   const champion = results?.[0];
 
-  let compareStats: { jevMs: number; otherMs: number; otherCostUsd: number; agreementPct: number; n: number; providerLabel: string } | null = null;
+  let compareStats:
+    | { jevMs: number; jevInputTokens: number; jevOutputTokens: number; otherMs: number; otherCostUsd: number; agreementPct: number; n: number; providerLabel: string }
+    | null = null;
   if (results && jevMs !== null && compareResult) {
     const scoreById = new Map(results.map((r) => [r.id, r.score]));
     const bucket = (s: number) => Math.min(3, Math.max(0, Math.round(s)));
@@ -158,6 +160,8 @@ export default function ToneDemo() {
     }
     compareStats = {
       jevMs,
+      jevInputTokens: results.reduce((s, r) => s + r.inputTokens, 0),
+      jevOutputTokens: results.reduce((s, r) => s + r.outputTokens, 0),
       otherMs: compareResult.elapsedMs,
       otherCostUsd: compareResult.costUsd,
       agreementPct: compareResult.results.length ? agree / compareResult.results.length : 0,
