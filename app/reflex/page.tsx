@@ -3,6 +3,8 @@ import ReflexGame from "./ReflexGame";
 
 export const metadata = {
   title: "Reaction Match — TypeSafe use cases",
+  description:
+    "Guess 'billing or not' on a support ticket before TypeSafe's Jev model answers — you're racing its real, measured response time, not a countdown.",
 };
 
 export default function ReflexPage() {

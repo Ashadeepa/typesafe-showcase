@@ -3,6 +3,8 @@ import ParallelDemo from "./ParallelDemo";
 
 export const metadata = {
   title: "Parallel processing — TypeSafe use cases",
+  description:
+    "16 support tickets judged 'is this about billing?' by TypeSafe's Jev model, sequentially vs. concurrently, with a live timing, cost, and agreement comparison against Gemini or Claude.",
 };
 
 export default function ParallelPage() {

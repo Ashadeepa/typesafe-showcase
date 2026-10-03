@@ -3,6 +3,8 @@ import CitationDemo from "./CitationDemo";
 
 export const metadata = {
   title: "Citation check — TypeSafe use cases",
+  description:
+    "A hallucination detector: 8 claims checked against the policy documents they cite, using TypeSafe's Jev model and a 3-way supports/contradicts/says-nothing judgment instead of a plain yes/no.",
 };
 
 export default function CitationPage() {

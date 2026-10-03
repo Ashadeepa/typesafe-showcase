@@ -14,6 +14,8 @@ const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["500", "600"], var
 
 export const metadata = {
   title: "Bluff — TypeSafe use cases",
+  description:
+    "The classic Indian card game Bluff (Cheat) against three AI opponents, each asking TypeSafe's Jev model how plausible your claim is — and whether to bluff on its own turn.",
 };
 
 export default function BluffPage() {

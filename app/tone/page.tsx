@@ -3,6 +3,8 @@ import ToneDemo from "./ToneDemo";
 
 export const metadata = {
   title: "Passive-aggressiveness meter — TypeSafe use cases",
+  description:
+    "10 notes and messages scored on a 4-level escalation rubric by TypeSafe's Jev model, sorted worst-to-best with a 'most passive-aggressive' crown — and real disagreement against Gemini or Claude.",
 };
 
 export default function TonePage() {

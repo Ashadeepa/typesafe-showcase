@@ -3,6 +3,8 @@ import JengaGame from "./JengaGame";
 
 export const metadata = {
   title: "Sentence Jenga — TypeSafe use cases",
+  description:
+    "Pull one word at a time out of a sentence; TypeSafe's Jev model judges after each pull whether it still means what it started out meaning — that probability is the tower's structural integrity.",
 };
 
 export default function JengaPage() {
